@@ -152,20 +152,23 @@ it does is SSH.
     - `DEPLOY_SSH_KEY`: the whole private key file.
     - `DEPLOY_KNOWN_HOSTS`: the `ssh-keyscan` line.
     - `DEPLOY_HOST`: the server's LAN address.
-    - `DEPLOY_USER`: `deploy`.
-  - *Variables:* `DOMAIN` = `gcm.example.com`, which becomes the
-    deployment's link.
+  - *Variables:*
+    - `DOMAIN` = `gcm.example.com`, which becomes the deployment's link.
+    - `DEPLOY_USER` = `deploy`.
 - **`testing`:**
   - *Deployment branches:* no restriction. Running Publish on a branch
     sends it here, and only collaborators can push or run workflows.
-  - The same four secrets.
-  - *Variables:* `DOMAIN` = `test.gcm.example.com`.
+  - The same three secrets.
+  - *Variables:* `DOMAIN` = `test.gcm.example.com`, and `DEPLOY_USER`
+    as for production.
 
 Keep the secrets in the environments, not the repository. That way only
 the deploy job can read them, and only for the refs each environment
-allows. The host and user aren't really secret, but the repository is
-public and so are its Actions logs: as secrets they show as `***`
-there, not as your LAN address.
+allows. The host isn't really secret, but the repository is public and
+so are its Actions logs: as a secret it shows as `***` there, not as
+your LAN address. The user is a variable instead, because GitHub masks
+every occurrence of a secret's value in the logs, and a word as common
+as `deploy` would turn the job's own name into `***`.
 
 **Settings → Actions → General → Approval for running fork pull request
 workflows:** *Require approval for all external contributors.* The

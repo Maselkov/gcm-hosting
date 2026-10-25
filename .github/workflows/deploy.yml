@@ -44,7 +44,7 @@ jobs:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
         run: |
           for name in SSH_KEY KNOWN_HOSTS DEPLOY_HOST DEPLOY_USER; do
             [[ -n ${!name} ]] || { echo "::error::$name is empty: is it set in the $ENVIRONMENT environment?"; exit 1; }
