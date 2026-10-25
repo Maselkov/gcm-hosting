@@ -60,6 +60,8 @@ services:
       # Sign-in and the forms: far less than a base needs.
       - traefik.http.middlewares.hosting-ratelimit.ratelimit.average=10
       - traefik.http.middlewares.hosting-ratelimit.ratelimit.burst=50
+      # The client, also behind a front proxy (deploy/compose.edge.yml).
+      - traefik.http.middlewares.hosting-ratelimit.ratelimit.sourcecriterion.requestheadername=X-Real-Ip
       - traefik.http.routers.hosting.middlewares=hosting-ratelimit
     networks:
       - gcm-control

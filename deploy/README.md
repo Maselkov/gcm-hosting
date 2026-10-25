@@ -83,7 +83,38 @@ ssh-keyscan -t ed25519 <server address>
 ACME_EMAIL=you@example.com
 CF_DNS_API_TOKEN=...        # as in the main README: Zone/DNS/Edit + Zone/Zone/Read
 # ACME_CA_SERVER=https://acme-staging-v02.api.letsencrypt.org/directory
+# FRONT_PROXY_IPS=10.0.0.2     # behind another proxy, below
 ```
+
+**Behind another reverse proxy** (one that owns the public 443, maybe
+itself behind Cloudflare): let it terminate TLS and proxy to Traefik's
+443 over HTTPS, and set `FRONT_PROXY_IPS` to its address (comma-separated
+for several). Traefik then believes the `X-Real-Ip` it sends, and the
+rate limits count each client by it. So the front proxy must set
+`X-Real-Ip` to the client's address itself, never pass on one a client
+sent. With Caddy:
+
+```caddy
+gtnh.example.com, *.gtnh.example.com {
+	reverse_proxy https://<this host>:443 {
+		header_up X-Real-IP {client_ip}
+		header_up X-Forwarded-For {client_ip}
+		transport http {
+			tls_server_name {http.request.host}
+		}
+	}
+}
+```
+
+`{client_ip}` is the connecting address, or with `trusted_proxies` and
+`client_ip_headers` the one Cloudflare passes on. `tls_server_name`
+makes Traefik serve its certificate for that name, which Caddy checks.
+Bases made before `FRONT_PROXY_IPS` was set count clients by their own
+labels until they're recreated (**Admin → Recreate**). A base's own
+per-client limits (chart images) still see the front proxy's address.
+
+With Cloudflare proxying, its free certificate covers only one level of
+subdomain: `*.gtnh.example.com`, but not testing's `*.test.gtnh.example.com`.
 
 `/srv/gcm-hosting/production/.env` and `/srv/gcm-hosting/testing/.env`:
 each is the app's usual settings (`.env.example`), plus `INSTANCE`.
@@ -121,6 +152,14 @@ visibility**. Otherwise, as `deploy`, run
   `test.gcm` and `*.test.gcm`, pointing at the same host and set to
   **DNS only**. `*.gcm` doesn't cover `*.test.gcm`, so Traefik gets
   testing its own wildcard certificate with the same token.
+- **Or keep testing on your LAN:** skip those two records and point
+  `test.gcm` and `*.test.gcm` at the host in your LAN's own DNS
+  instead. The certificate still comes, since the DNS challenge only
+  needs the token, not a reachable name. If production has a wildcard
+  record (or a front proxy, above, answers `*.gcm`), `test.gcm` still
+  resolves publicly through it, so have that proxy refuse it (in Caddy,
+  a `test.gcm.example.com` site that does `abort`). The Discord redirect
+  below works either way: it happens in the browser.
 - **Discord:** on the same application, add a second redirect,
   `https://test.gcm.example.com/login/discord/callback`.
 

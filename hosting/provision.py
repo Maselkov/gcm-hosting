@@ -197,6 +197,9 @@ def container_spec(slug, api_key):
         middleware = f"{router}-ratelimit"
         labels[f"traefik.http.middlewares.{middleware}.ratelimit.average"] = str(config.RATE_LIMIT_AVERAGE)
         labels[f"traefik.http.middlewares.{middleware}.ratelimit.burst"] = str(config.RATE_LIMIT_BURST)
+        # Traefik sets it to whoever connected, or keeps a trusted front
+        # proxy's (deploy/compose.edge.yml): the client either way.
+        labels[f"traefik.http.middlewares.{middleware}.ratelimit.sourcecriterion.requestheadername"] = "X-Real-Ip"
         labels[f"traefik.http.routers.{router}.middlewares"] = middleware
     environment = {
         "API_KEY": api_key,

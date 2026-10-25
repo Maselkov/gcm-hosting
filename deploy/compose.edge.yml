@@ -3,7 +3,8 @@
 # the labels on its containers. Makes the networks they join, as in
 # docker-compose.yml: the apps on gcm-control, their bases on gcm-bases,
 # and only Traefik on both.
-# Settings from edge/.env: ACME_EMAIL, CF_DNS_API_TOKEN[, ACME_CA_SERVER].
+# Settings from edge/.env: ACME_EMAIL, CF_DNS_API_TOKEN[, ACME_CA_SERVER,
+# FRONT_PROXY_IPS].
 services:
   traefik:
     # v3.6+: older ones speak a Docker API version Docker 29 refuses.
@@ -16,6 +17,10 @@ services:
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.websecure.address=:443
+      # A front proxy (deploy/README.md) says who the client is in
+      # X-Real-Ip and X-Forwarded-*; believe it only from these. From
+      # anyone else Traefik sets them itself, to whoever connected.
+      - --entrypoints.websecure.forwardedHeaders.trustedIPs=${FRONT_PROXY_IPS:-127.0.0.1/32}
       # One wildcard certificate per instance, proven through Cloudflare's
       # DNS, as in docker-compose.yml.
       - --certificatesresolvers.le.acme.email=${ACME_EMAIL:?}
