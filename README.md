@@ -21,6 +21,11 @@ You need a host with Docker, ports 80 and 443 open, and DNS for both
 2. `cp .env.example .env` and fill it in.
 3. `docker compose up -d --build`
 
+CI publishes the image as `ghcr.io/maselkov/gcm-hosting` (`latest` from
+`main`, `1.2.3` and `1.2` from a `v1.2.3` tag); to use it instead of
+building, put `image: ghcr.io/maselkov/gcm-hosting:latest` in place of
+`build: .` in `docker-compose.yml`.
+
 Open `https://DOMAIN`, sign in, make a base. The page shows the base's
 admin token once; from there the base works like any self-hosted one
 (the in-game setup is under **Settings → Status → Connect a computer**
