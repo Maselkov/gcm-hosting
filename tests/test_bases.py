@@ -142,3 +142,28 @@ def test_dev_login_only_starts_on_a_test_domain(tmp_path, monkeypatch, provision
     else:
         with pytest.raises(RuntimeError, match="DEV_LOGIN is for local testing only"):
             create_app(provisioner)
+
+
+def test_a_new_base_is_private_unless_chosen_otherwise(client, app, provisioner):
+    sign_in(client, "Alice")
+    assert make_base(client, "copper-falcon-4821").status_code == 201
+    assert provisioner.private == {"copper-falcon-4821"}
+
+    other = app.test_client()
+    sign_in(other, "Bob")
+    with mock.patch.object(names, "generate", return_value="quiet-rook-4833"):
+        response = other.post("/bases", data={"csrf": csrf(other), "visibility": "public"})
+    assert response.status_code == 201
+    assert provisioner.private == {"copper-falcon-4821"}
+
+
+def test_an_image_too_old_to_make_it_private_says_so(client, provisioner):
+    sign_in(client, "Alice")
+    provisioner.fail_private = True
+
+    response = make_base(client, "copper-falcon-4821")
+
+    assert response.status_code == 500
+    assert "make private bases yet" in response.get_data(as_text=True)
+    assert provisioner.running == {}
+    assert db.owner_of("copper-falcon-4821") is None

@@ -68,8 +68,14 @@ API_KEY    = "{{ base.api_key }}"</pre>
   <h2>Make a base</h2>
   <form method="post" action="{{ url_for('pages.create_base') }}" class="create">
     <input type="hidden" name="csrf" value="{{ csrf }}">
+    <fieldset class="visibility">
+      <legend>Who can see it</legend>
+      <label><input type="radio" name="visibility" value="private" checked> <b>Only people you invite</b>: sign-in needed to see anything.</label>
+      <label><input type="radio" name="visibility" value="public"> <b>Anyone with the link</b>: links you share show a preview, too.</label>
+    </fieldset>
     <button>Make a base</button>
   </form>
+  <p class="hint">You can change it later in your base: <b>Settings (⚙) → Manage users</b>.</p>
   <p class="hint">It gets a made-up address, like <b>copper-falcon-4821.{{ domain }}</b>, that is hard to guess. Starting it takes a few seconds.</p>
   {% endif %}
 

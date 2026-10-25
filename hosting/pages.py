@@ -5,7 +5,7 @@ import secrets
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, session, url_for
 
-from hosting import auth, config, db, indexer, names
+from hosting import auth, config, db, indexer, names, provision
 
 bp = Blueprint("pages", __name__)
 log = logging.getLogger("hosting")
@@ -104,6 +104,7 @@ def logout():
 def create_base():
     auth.check_csrf()
     account = auth.current_account()
+    private = request.form.get("visibility") != "public"
     api_key = secrets.token_hex(32)
     for _ in range(NAME_TRIES):
         slug = names.generate()
@@ -120,12 +121,23 @@ def create_base():
         indexer.run(provisioner())
         provisioner().create(slug, api_key)
         token = provisioner().create_admin(slug, account["name"])
+        if private:
+            provisioner().make_private(slug)
+    except provision.TooOld:
+        log.exception("Couldn't make base %s private", slug)
+        provisioner().remove(slug)
+        db.release_base(slug)
+        return render_index(
+            error="This host's server version can't make private bases yet. Choose Anyone with the link, "
+            "or try again once the host updates.",
+            status=500,
+        )
     except Exception:
         log.exception("Couldn't start base %s", slug)
         provisioner().remove(slug)
         db.release_base(slug)
         return render_index(error="Your base couldn't be started. Try again later.", status=500)
-    log.info("Base %s made for %s", slug, account["id"])
+    log.info("Base %s made for %s (%s)", slug, account["id"], "private" if private else "public")
     # Shown on this response only; this app doesn't keep it.
     return render_index(created={"slug": slug, "url": config.base_url(slug), "token": token}, status=201)
 

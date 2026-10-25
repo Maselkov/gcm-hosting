@@ -107,6 +107,10 @@ def container_name(slug):
     return f"gcm-base-{slug}"
 
 
+class TooOld(RuntimeError):
+    """The base's image doesn't have a command this app runs in it."""
+
+
 def volume_name(slug):
     return f"gcm-base-{slug}-data"
 
@@ -191,6 +195,16 @@ class DockerProvisioner:
         if result.exit_code != 0:
             raise RuntimeError(f"create-admin failed for {slug}: {output}")
         return output.splitlines()[-1]
+
+    def make_private(self, slug):
+        """Only the base's signed-in users see its crafts, network and
+        power (`app.py visibility`, from GTNH Craft Monitor 5.2 on). Its
+        admins can change it in Manage users after."""
+        container = self.client.containers.get(container_name(slug))
+        result = container.exec_run(["python", "app.py", "visibility", "private"])
+        if result.exit_code != 0:
+            output = result.output.decode(errors="replace").strip()
+            raise TooOld(f"visibility failed for {slug}: {output[-300:]}")
 
     def _started(self, slug, timeout=60):
         """slug's container once its server is serving. Only the logs since

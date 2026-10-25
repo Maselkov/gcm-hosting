@@ -154,8 +154,14 @@ Every action is logged with who did it.
   about 655 million of them), so nobody can take a name like `official`,
   pass for someone else, or claim a deleted base's address. With the
   wildcard certificate, they can't be listed either. That isn't access
-  control, though: a base is readable by anyone with its address, and
-  addresses get shared.
+  control, though: addresses get shared.
+- **New bases are private unless their owner picks otherwise**: only
+  their signed-in users see the crafts, network and power, and link
+  previews show nothing. The form offers "Anyone with the link" instead,
+  and owners can change it later in their base (**Manage users**). This
+  needs a GTNH Craft Monitor image from 5.2 on (`app.py visibility`);
+  with an older `IMAGE`, making a private base fails with a message
+  saying so, and public ones still work.
 - **Players' Minecraft servers must allow the OpenComputers Internet
   Card** to reach this host. Some multiplayer servers turn it off.
 - Bases share one Docker network and trust its subnet's

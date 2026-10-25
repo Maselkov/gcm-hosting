@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from hosting import config, create_app, indexer, names
+from hosting import config, create_app, indexer, names, provision
 
 
 class FakeProvisioner:
@@ -19,6 +19,8 @@ class FakeProvisioner:
         # What index_shared_gamedata() returns, or an exception it raises.
         self.index_result = {"versions": [{"version": "2.9.0", "state": "current"}]}
         self.fail_admin = False
+        self.private = set()
+        self.fail_private = False
 
     def create(self, slug, api_key):
         assert slug not in self.running
@@ -28,6 +30,11 @@ class FakeProvisioner:
         if self.fail_admin:
             raise RuntimeError("container exited")
         return f"gcm_token_for_{name}"
+
+    def make_private(self, slug):
+        if self.fail_private:
+            raise provision.TooOld("unknown command")
+        self.private.add(slug)
 
     def details(self):
         return {
@@ -86,6 +93,7 @@ class FakeProvisioner:
 
     def remove(self, slug):
         self.running.pop(slug, None)
+        self.private.discard(slug)
         self.stopped.discard(slug)
 
 

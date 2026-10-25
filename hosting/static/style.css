@@ -41,6 +41,8 @@ pre { background: var(--card); border: 1px solid var(--border); border-radius: 6
 details { margin: 0.5rem 0; }
 form.create { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 form.inline { display: inline; }
+fieldset.visibility { flex-basis: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.9rem 0.6rem; margin: 0; }
+fieldset.visibility label { display: block; margin: 0.25rem 0; }
 input { font: inherit; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
 button, .button { font: inherit; padding: 0.4rem 0.9rem; border: 0; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; text-decoration: none; display: inline-block; }
 button.danger { background: var(--danger); }
