@@ -157,3 +157,44 @@ def test_stats_forget_bases_that_stop_or_go(bases):
     db.release_base("bob")
     stats.sample_all(bases)
     assert stats.current() == {}
+
+
+def test_renaming_moves_the_base_to_its_new_address(operator, bases):
+    api_key = db.base("alice")["api_key"]
+    response = act(operator, "alice", "rename", name="Maselkov")
+
+    assert response.status_code == 302 and response.headers["Location"].endswith("/admin/bases/maselkov")
+    assert "alice" not in bases.running and bases.running["maselkov"] == api_key
+    assert db.base("alice") is None and db.base("maselkov")["owner_name"] == "Alice"
+    assert "https://maselkov.example.test" in operator.get("/admin/bases/maselkov").get_data(as_text=True)
+
+
+def test_a_stopped_base_stays_stopped_when_renamed(operator, bases):
+    act(operator, "alice", "stop")
+    act(operator, "alice", "rename", name="quiet")
+    assert bases.status("quiet") == "exited"
+    assert db.base("quiet")["held_at"] is not None
+
+
+@pytest.mark.parametrize(
+    ("name", "why"),
+    [("bob", "taken"), ("test", "reserved"), ("-x", "letters"), ("a" * 41, "letters"), ("xn--abc", "letters")],
+)
+def test_a_name_thats_taken_reserved_or_not_a_dns_label_is_refused(operator, bases, name, why):
+    act(operator, "alice", "rename", name=name)
+    page = operator.get("/admin/bases/alice").get_data(as_text=True)
+    assert why in page
+    assert "alice" in bases.running and db.base("alice") is not None
+
+
+def test_a_failed_rename_leaves_the_base_as_it_was(operator, bases):
+    bases.fail_rename = True
+    act(operator, "alice", "rename", name="newname")
+    assert "Renaming failed" in operator.get("/admin/bases/alice").get_data(as_text=True)
+    assert db.base("alice") is not None and db.base("newname") is None
+
+
+def test_only_operators_can_rename(client, bases):
+    sign_in(client, "Alice")
+    assert act(client, "alice", "rename", name="mine").status_code == 404
+    assert db.base("alice") is not None

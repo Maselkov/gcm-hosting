@@ -20,6 +20,8 @@ class FakeProvisioner:
         self.index_result = {"versions": [{"version": "2.9.0", "state": "current"}]}
         self.fail_admin = False
         self.private = set()
+        self.fail_rename = False
+        self.reports = {}  # slug -> last_report()'s answer, or an exception
         self.fail_private = False
 
     def create(self, slug, api_key):
@@ -30,6 +32,20 @@ class FakeProvisioner:
         if self.fail_admin:
             raise RuntimeError("container exited")
         return f"gcm_token_for_{name}"
+
+    def last_report(self, slug):
+        report = self.reports.get(slug)
+        if isinstance(report, Exception):
+            raise report
+        return report
+
+    def rename(self, old, new, api_key):
+        if self.fail_rename:
+            raise RuntimeError("copy failed")
+        self.running[new] = self.running.pop(old)
+        if old in self.stopped:
+            self.stopped.discard(old)
+            self.stopped.add(new)
 
     def make_private(self, slug):
         if self.fail_private:

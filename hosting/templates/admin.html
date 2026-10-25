@@ -75,6 +75,7 @@
       <th>{% if sort == key %}{{ label }} ▾{% else %}<a href="{{ url_for('admin.overview', sort=key, refresh=refresh) }}">{{ label }}</a>{% endif %}</th>
       {% endfor %}
       <th>Up</th>
+      <th>Last report</th>
       <th>Notes</th>
     </tr>
   </thead>
@@ -98,6 +99,7 @@
         <small>{{ b.size_bytes|bytes }} / {{ b.quota_bytes|bytes }}</small>
       </td>
       <td><small>{{ b.uptime or "–" }}</small></td>
+      <td><small>{% if b.last_report_at %}{{ b.last_report_at|when }}{% else %}<span class="muted">never</span>{% endif %}</small></td>
       <td><small>{{ b.warnings|join(", ") }}</small></td>
     </tr>
   {% endfor %}

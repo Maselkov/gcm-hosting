@@ -6,6 +6,7 @@ import functools
 import hmac
 import json
 import secrets
+import time
 import urllib.parse
 import urllib.request
 
@@ -46,6 +47,30 @@ def operator_required(view):
         return view(*args, **kwargs)
 
     return wrapped
+
+
+# Discord IDs are snowflakes: their top bits are milliseconds since 2015.
+DISCORD_EPOCH_MS = 1420070400000
+
+
+def account_created(identity):
+    """When a Discord account was made, as a Unix time, read from its ID.
+    None for an identity that isn't Discord's (DEV_LOGIN)."""
+    kind, _, user_id = identity.partition(":")
+    if kind != "discord" or not user_id.isdigit():
+        return None
+    return ((int(user_id) >> 22) + DISCORD_EPOCH_MS) / 1000
+
+
+def too_new(account):
+    """Why account may not make a base yet, or None."""
+    if not config.MIN_ACCOUNT_AGE_DAYS or is_operator(account):
+        return None
+    created = account_created(account["identity"])
+    if created is None or time.time() - created >= config.MIN_ACCOUNT_AGE_DAYS * 86400:
+        return None
+    days = f"{config.MIN_ACCOUNT_AGE_DAYS:g}"
+    return f"Your Discord account must be at least {days} days old to make a base."
 
 
 def csrf_token():

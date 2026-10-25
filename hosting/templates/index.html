@@ -44,6 +44,11 @@
     {% else %}
     <p class="hint">Disk: {{ base.size_bytes|bytes }} of {{ base.quota_bytes|bytes }}.</p>
     {% endif %}
+    {% if base.removal_due %}
+    <p class="notice">Not connected yet. If the game hasn't reported to it by {{ base.removal_due|when }}, it's removed to free the slot; connect a computer before then.</p>
+    {% elif base.inactive_days %}
+    <p class="notice">The game hasn't reported for {{ base.inactive_days }} days. The host may remove bases that aren't used any more.</p>
+    {% endif %}
     <details>
       <summary>In-game settings</summary>
       <p>The Connect a computer command on your base's page fills these in for you.</p>

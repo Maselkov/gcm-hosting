@@ -1,10 +1,11 @@
 import re
+import time
 from unittest import mock
 
 import pytest
 from conftest import csrf, make_base, sign_in
 
-from hosting import config, db, names
+from hosting import auth, config, db, names
 
 
 def test_a_new_base_is_started_and_its_admin_token_shown_once(client, provisioner):
@@ -167,3 +168,44 @@ def test_an_image_too_old_to_make_it_private_says_so(client, provisioner):
     assert "make private bases yet" in response.get_data(as_text=True)
     assert provisioner.running == {}
     assert db.owner_of("copper-falcon-4821") is None
+
+
+# A Discord ID from the first millisecond of 2015.
+OLD_ID = str(1 << 22)
+
+
+def discord_id(created):
+    return str(int(created * 1000 - auth.DISCORD_EPOCH_MS) << 22)
+
+
+def test_the_account_age_is_read_from_the_discord_id():
+    assert auth.account_created(f"discord:{OLD_ID}") == 1420070400.001
+    # A known one: Discord's own example snowflake, 2016-04-30 11:18:25.796 UTC.
+    assert auth.account_created("discord:175928847299117063") == 1462015105.796
+    assert auth.account_created("dev:Alice") is None
+
+
+@pytest.mark.parametrize(
+    ("identity", "operator", "minimum", "allowed"),
+    [
+        (f"discord:{OLD_ID}", False, 30, True),
+        ("new", False, 30, False),
+        ("new", True, 30, True),  # operators always can
+        ("new", False, 0, True),  # 0: any age
+        ("dev:Alice", False, 30, True),
+    ],
+)
+def test_a_discord_account_must_be_old_enough(client, provisioner, monkeypatch, identity, operator, minimum, allowed):
+    if identity == "new":
+        identity = f"discord:{discord_id(time.time() - 86400)}"
+    monkeypatch.setattr(config, "MIN_ACCOUNT_AGE_DAYS", minimum)
+    monkeypatch.setattr(config, "ADMIN_IDENTITIES", {identity} if operator else set())
+    with client.session_transaction() as session:
+        session["account_id"] = db.account_for(identity, "Alice")
+
+    response = make_base(client, "copper-falcon-4821")
+
+    assert response.status_code == (201 if allowed else 403)
+    if not allowed:
+        assert "at least 30 days old" in response.get_data(as_text=True)
+        assert provisioner.running == {}

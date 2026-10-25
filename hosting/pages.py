@@ -5,7 +5,7 @@ import secrets
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, session, url_for
 
-from hosting import auth, config, db, indexer, names, provision
+from hosting import activity, auth, config, db, indexer, names, provision
 
 bp = Blueprint("pages", __name__)
 log = logging.getLogger("hosting")
@@ -36,7 +36,15 @@ def render_index(error=None, created=None, status=200):
     bases = []
     if account:
         for base in db.bases_of(account["id"]):
-            bases.append({**base, "url": config.base_url(base["slug"]), "status": provisioner().status(base["slug"])})
+            bases.append(
+                {
+                    **base,
+                    "url": config.base_url(base["slug"]),
+                    "status": provisioner().status(base["slug"]),
+                    "removal_due": activity.removal_due(base),
+                    "inactive_days": activity.inactive_days(base),
+                }
+            )
     return (
         render_template(
             "index.html",
@@ -104,6 +112,9 @@ def logout():
 def create_base():
     auth.check_csrf()
     account = auth.current_account()
+    problem = auth.too_new(account)
+    if problem:
+        return render_index(error=problem, status=403)
     private = request.form.get("visibility") != "public"
     api_key = secrets.token_hex(32)
     for _ in range(NAME_TRIES):

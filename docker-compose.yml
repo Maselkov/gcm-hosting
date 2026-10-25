@@ -1,5 +1,8 @@
-# Traefik in front, this app at DOMAIN, and each base (started by this
-# app, not listed here) at <slug>.DOMAIN on the gcm-bases network.
+# Traefik in front, this app at DOMAIN on the gcm-control network, and
+# each base (started by this app, not listed here) at <slug>.DOMAIN on
+# the gcm-bases network. Only Traefik is on both: a base can't reach this
+# app except through it, and this app reaches bases only through the
+# Docker API.
 # Settings come from .env; see README.md.
 services:
   traefik:
@@ -33,6 +36,7 @@ services:
       - letsencrypt:/letsencrypt
     networks:
       - gcm-bases
+      - gcm-control
 
   hosting:
     build: .
@@ -52,8 +56,13 @@ services:
       - traefik.http.routers.hosting.tls.domains[0].main=${DOMAIN}
       - traefik.http.routers.hosting.tls.domains[0].sans=*.${DOMAIN}
       - traefik.http.services.hosting.loadbalancer.server.port=8000
+      - traefik.docker.network=gcm-control
+      # Sign-in and the forms: far less than a base needs.
+      - traefik.http.middlewares.hosting-ratelimit.ratelimit.average=10
+      - traefik.http.middlewares.hosting-ratelimit.ratelimit.burst=50
+      - traefik.http.routers.hosting.middlewares=hosting-ratelimit
     networks:
-      - gcm-bases
+      - gcm-control
 
 networks:
   gcm-bases:
@@ -61,6 +70,8 @@ networks:
     ipam:
       config:
         - subnet: 172.30.0.0/16
+  gcm-control:
+    name: gcm-control
 
 volumes:
   letsencrypt:

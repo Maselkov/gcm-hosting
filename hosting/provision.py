@@ -50,6 +50,32 @@ print(json.dumps({"name": pick["display_name"], "token": store.users.replace_cre
 """
 
 
+# Run in a base (DockerProvisioner.last_report): the newest time its game
+# reported anything that's kept - a power reading, a network scan, a
+# craft ending - or null if never. Straight from the databases, so it
+# works on any server version; a table that isn't there counts as none.
+LAST_REPORT_SCRIPT = """
+import json, sqlite3
+times = []
+for name, sql in (
+    ("power.db", "SELECT MAX(ts) FROM power_readings"),
+    ("app.db", "SELECT MAX(updated_at) FROM network_snapshot"),
+    ("app.db", "SELECT MAX(occurred_at) FROM craft_events"),
+):
+    try:
+        conn = sqlite3.connect(f"file:/app/data/{name}?mode=ro", uri=True)
+        try:
+            (value,) = conn.execute(sql).fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        value = None
+    if value is not None:
+        times.append(value)
+print(json.dumps(max(times) if times else None))
+"""
+
+
 # Run in a one-off container of IMAGE over the shared game data
 # (hosting/indexer.py): builds each version's index (gcm/gamedata_index.py)
 # that's missing or out of date, so bases read the shared one instead of
@@ -102,6 +128,21 @@ def indexer_spec():
     }
 
 
+def copy_spec(source, target):
+    """docker-py's containers.run() arguments for copying one volume's
+    files into another, owners and times kept (renaming a base: Docker
+    can't rename a volume)."""
+    return {
+        "image": config.IMAGE,
+        "command": ["cp", "-a", "/from/.", "/to/"],
+        "volumes": {source: {"bind": "/from", "mode": "ro"}, target: {"bind": "/to", "mode": "rw"}},
+        "labels": {"gcm-hosting.copy": "1", INSTANCE_LABEL: config.INSTANCE},
+        "user": "0",
+        "network_disabled": True,
+        "remove": True,
+    }
+
+
 def started_timestamp(docker_time):
     """Docker's "2026-10-25T12:46:52.128342874Z" as whole Unix seconds."""
     return int(datetime.datetime.fromisoformat(docker_time[:19]).replace(tzinfo=datetime.UTC).timestamp())
@@ -150,6 +191,13 @@ def container_spec(slug, api_key):
         # base names stay out of the public certificate logs.
         labels[f"traefik.http.routers.{router}.tls.domains[0].main"] = config.DOMAIN
         labels[f"traefik.http.routers.{router}.tls.domains[0].sans"] = f"*.{config.DOMAIN}"
+    if config.RATE_LIMIT_AVERAGE:
+        # Its own, not one shared through another container's labels: that
+        # one going away would take every base's router with it.
+        middleware = f"{router}-ratelimit"
+        labels[f"traefik.http.middlewares.{middleware}.ratelimit.average"] = str(config.RATE_LIMIT_AVERAGE)
+        labels[f"traefik.http.middlewares.{middleware}.ratelimit.burst"] = str(config.RATE_LIMIT_BURST)
+        labels[f"traefik.http.routers.{router}.middlewares"] = middleware
     environment = {
         "API_KEY": api_key,
         "PUBLIC_URL": config.base_url(slug),
@@ -190,12 +238,41 @@ class DockerProvisioner:
         self.errors = docker.errors
 
     def create(self, slug, api_key):
+        self._create_volumes(slug)
+        self.client.containers.run(**container_spec(slug, api_key))
+
+    def _create_volumes(self, slug):
         # Made first, so it carries the label volume_sizes() finds it by.
         self.client.volumes.create(volume_name(slug), labels={LABEL: slug, INSTANCE_LABEL: config.INSTANCE})
         self.client.volumes.create(
             gamedata_volume_name(slug), labels={"gcm-hosting.gamedata": slug, INSTANCE_LABEL: config.INSTANCE}
         )
-        self.client.containers.run(**container_spec(slug, api_key))
+
+    def rename(self, old, new, api_key):
+        """Moves old's base to new: stopped, its volumes copied to new's,
+        a container made for new's address on the current IMAGE, then old's
+        container and volumes removed. If any step fails, new's half is
+        removed and old started again as it was. new is left stopped if
+        old was."""
+        container = self.client.containers.get(container_name(old))
+        was_running = container.status == "running"
+        container.stop()
+        try:
+            self._create_volumes(new)
+            for source, target in (
+                (volume_name(old), volume_name(new)),
+                (gamedata_volume_name(old), gamedata_volume_name(new)),
+            ):
+                self.client.containers.run(**copy_spec(source, target))
+            self.client.containers.run(**container_spec(new, api_key))
+        except Exception:
+            self.remove(new)
+            if was_running:
+                container.start()
+            raise
+        self.remove(old)
+        if not was_running:
+            self.stop(new)
 
     def create_admin(self, slug, name, timeout=60):
         """Makes the base's first admin and returns their sign-in token.
@@ -207,6 +284,16 @@ class DockerProvisioner:
         if result.exit_code != 0:
             raise RuntimeError(f"create-admin failed for {slug}: {output}")
         return output.splitlines()[-1]
+
+    def last_report(self, slug):
+        """When slug's game last reported (LAST_REPORT_SCRIPT), as a Unix
+        time, or None if never. Raises if it can't tell."""
+        container = self.client.containers.get(container_name(slug))
+        result = container.exec_run(["python", "-c", LAST_REPORT_SCRIPT])
+        output = result.output.decode(errors="replace").strip()
+        if result.exit_code != 0:
+            raise RuntimeError(f"last report of {slug} unknown: {output[-300:]}")
+        return json.loads(output.splitlines()[-1])
 
     def make_private(self, slug):
         """Only the base's signed-in users see its crafts, network and

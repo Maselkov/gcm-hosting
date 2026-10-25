@@ -6,11 +6,12 @@ Only for accounts in ADMIN_IDENTITIES; anyone else gets a 404."""
 
 import datetime
 import logging
+import re
 import time
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 
-from hosting import auth, config, db, indexer, provision, quota, stats
+from hosting import activity, auth, config, db, indexer, provision, quota, stats
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 log = logging.getLogger("hosting.admin")
@@ -23,6 +24,8 @@ SORTS = {
     "owner": lambda b: b["owner_name"].lower(),
 }
 WARN_AT = 0.8  # of a limit: the row is flagged
+# A base's new name (rename): one DNS label, at most 40 characters.
+NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$")
 
 
 def provisioner():
@@ -73,6 +76,8 @@ def _rows():
             "memory_limit_bytes": reading.get("memory_limit_bytes"),
             "memory_percent": _percent(reading.get("memory_bytes"), reading.get("memory_limit_bytes")),
             "disk_percent": _percent(base["size_bytes"], base["quota_bytes"]),
+            "inactive_days": activity.inactive_days(base),
+            "removal_due": activity.removal_due(base),
         }
         row["warnings"] = [
             text
@@ -87,6 +92,11 @@ def _rows():
                 (f"restarted {row['restarts']}x", row["restarts"]),
                 ("old image", container.get("image") and not row["image_current"]),
                 ("not running", state == "exited" or status == "missing"),
+                (f"no game report for {row['inactive_days']} days", row["inactive_days"]),
+                (
+                    "game never reported",
+                    row["removal_due"] and time.time() - base["created_at"] > activity.DAY,
+                ),
             )
             if on
         ]
@@ -297,6 +307,38 @@ def set_quota(slug):
     # At once, rather than at the next check: it may start it again.
     quota.check(provisioner())
     return _done(slug, f"Quota set to {raw} MB." if raw else "Quota back to the default.")
+
+
+def name_problem(name):
+    if not NAME_RE.match(name) or name.startswith("xn--"):
+        return "Use 1 to 40 lowercase letters, digits and dashes, not starting or ending with a dash."
+    if name in config.RESERVED_NAMES:
+        return f"{name} is reserved (RESERVED_NAMES)."
+    if db.base(name) is not None:
+        return db.NAME_TAKEN
+    return None
+
+
+@bp.route("/bases/<slug>/rename", methods=["POST"])
+@auth.operator_required
+def rename(slug):
+    base = _action(slug)
+    new = request.form.get("name", "").strip().lower()
+    if new == slug:
+        return redirect(url_for("admin.base_page", slug=slug))
+    problem = name_problem(new)
+    if problem:
+        flash(problem)
+        return redirect(url_for("admin.base_page", slug=slug))
+    try:
+        provisioner().rename(slug, new, base["api_key"])
+    except Exception:
+        log.exception("Renaming %s to %s failed", slug, new)
+        flash(f"Renaming failed, so it's still {slug}; its logs may say why.")
+        return redirect(url_for("admin.base_page", slug=slug))
+    db.rename_base(slug, new)
+    stats.reset()
+    return _done(new, f"Renamed from {slug}: it's now at {config.base_url(new)}. Point its computers there.")
 
 
 @bp.route("/bases/<slug>/delete", methods=["POST"])

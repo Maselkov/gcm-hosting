@@ -32,11 +32,13 @@ CREATE TABLE IF NOT EXISTS bases (
     suspended_at REAL,
     -- Set while the host has stopped it (the control panel): it stays
     -- stopped until started there, whatever its quota.
-    held_at REAL
+    held_at REAL,
+    -- When its game last reported (hosting/activity.py), NULL if never.
+    last_report_at REAL
 );
 """
 # Columns added since a table was first made: (table, column, definition).
-ADDED_COLUMNS = [("bases", "held_at", "REAL")]
+ADDED_COLUMNS = [("bases", "held_at", "REAL"), ("bases", "last_report_at", "REAL")]
 
 
 def path():
@@ -85,13 +87,13 @@ def account(account_id):
 
 BASE_COLUMNS = (
     "bases.slug, bases.api_key, bases.created_at, bases.quota_bytes, bases.size_bytes, bases.suspended_at, "
-    "bases.held_at, accounts.name, accounts.identity"
+    "bases.held_at, bases.last_report_at, accounts.name, accounts.identity"
 )
 BASE_FROM = "bases JOIN accounts ON accounts.id = bases.owner_id"
 
 
 def _base(row):
-    slug, api_key, created_at, quota, size, suspended_at, held_at, owner_name, owner_identity = row
+    slug, api_key, created_at, quota, size, suspended_at, held_at, last_report_at, owner_name, owner_identity = row
     return {
         "slug": slug,
         "api_key": api_key,
@@ -101,6 +103,7 @@ def _base(row):
         "size_bytes": size,
         "suspended_at": suspended_at,
         "held_at": held_at,
+        "last_report_at": last_report_at,
         "owner_name": owner_name,
         "owner_identity": owner_identity,
     }
@@ -131,6 +134,11 @@ def set_held(slug, held_at):
     """Marks a base stopped (held_at, a time) or started (None) by the host."""
     with transaction() as conn:
         conn.execute("UPDATE bases SET held_at = ? WHERE slug = ?", (held_at, slug))
+
+
+def record_report(slug, last_report_at):
+    with transaction() as conn:
+        conn.execute("UPDATE bases SET last_report_at = ? WHERE slug = ?", (last_report_at, slug))
 
 
 def count_accounts():
@@ -171,6 +179,16 @@ def claim_base(slug, owner_id, api_key):
                 "INSERT INTO bases (slug, owner_id, api_key, created_at) VALUES (?, ?, ?, ?)",
                 (slug, owner_id, api_key, time.time()),
             )
+    except sqlite3.IntegrityError:
+        return NAME_TAKEN
+    return None
+
+
+def rename_base(old, new):
+    """Returns NAME_TAKEN if new is, otherwise None."""
+    try:
+        with transaction() as conn:
+            conn.execute("UPDATE bases SET slug = ? WHERE slug = ?", (new, old))
     except sqlite3.IntegrityError:
         return NAME_TAKEN
     return None

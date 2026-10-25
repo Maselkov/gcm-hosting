@@ -144,6 +144,12 @@ A base's page has its last 200 log lines, its in-game settings, and:
   shows the new one once. If the base has no admin left, it makes one.
 - **Disk quota:** in MB, or empty for the default. It takes effect at
   once, stopping or starting the base.
+- **Rename:** a new address for the same base. It's stopped, its data
+  copied to volumes under the new name (Docker can't rename one), and it
+  starts on the current `IMAGE`; the old address stops working, so its
+  computers need the new `SERVER_URL` and everyone signs in again. Names
+  in `RESERVED_NAMES` (`test`, `www`, ... - the testing instance lives at
+  `test.DOMAIN`) are refused. If a step fails, the base is left as it was.
 - **Delete:** the container and all its data, after typing its name.
 
 Every action is logged with who did it.
@@ -168,9 +174,40 @@ Every action is logged with who did it.
   saying so, and public ones still work.
 - **Players' Minecraft servers must allow the OpenComputers Internet
   Card** to reach this host. Some multiplayer servers turn it off.
-- Bases share one Docker network and trust its subnet's
-  `X-Forwarded-*` headers. That's safe because bases never run code
-  their players supply; they're all the same image.
+- **Who can make a base.** A Discord account must be
+  `MIN_ACCOUNT_AGE_DAYS` (30) old, read from its ID, so throwaway
+  accounts can't fill the slots; operators always can. Slots also come
+  back by themselves: a base the game never reported to is removed
+  `NEVER_CONNECTED_DAYS` (7) after it was made (it holds nothing yet;
+  its owner's card says when). One the game stopped reporting to for
+  `INACTIVE_DAYS` (60) is only flagged, in the control panel and on its
+  owner's card: delete it yourself if you want the slot back. "The game
+  reported" is the newest power reading, network scan or craft ending in
+  the base's databases, checked hourly.
+- **Rate limits.** Traefik answers 429 to one IP past
+  `RATE_LIMIT_AVERAGE` (50) requests a second to a base, with bursts up
+  to `RATE_LIMIT_BURST` (500): enough for the page's polling and a
+  Network tab's worth of icons at once. This app's own pages allow 10 a
+  second, bursts of 50 (`docker-compose.yml`).
+- **Networks.** Bases share the `gcm-bases` network and trust its
+  subnet's `X-Forwarded-*` headers. That's safe because bases never run
+  code their players supply; they're all the same image. This app is on
+  `gcm-control` with Traefik only, so a base can't reach it except
+  through Traefik. To also keep bases from reaching anything private
+  from the host's side (other machines on your LAN, a cloud metadata
+  address), add host firewall rules, for example (as root; the second
+  rule, inserted above the first, keeps Traefik's own connections to the
+  bases, which are inside that subnet too):
+
+  ```bash
+  iptables -I DOCKER-USER -s 172.30.0.0/16 -d 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16 -m conntrack --ctstate NEW -j DROP
+  iptables -I DOCKER-USER -s 172.30.0.0/16 -d 172.30.0.0/16 -j RETURN
+  ```
+
+  They're an example, not part of this app: make them persist the way
+  your distribution does, and check a base still loads afterwards.
+
+  Bases still reach the internet, for push notifications and webhooks.
 - You hold players' data: say how long you keep it and how to delete it
   (deleting a base on the page removes its container and volume).
 

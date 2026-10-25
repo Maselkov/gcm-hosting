@@ -4,7 +4,7 @@
 {% block content %}
 <header class="page-head">
   <h1>{{ base.slug }} <span class="badge state-{{ base.state|replace(' ', '-') }}">{{ base.state }}</span></h1>
-  <p class="hint"><a href="{{ base.url }}">{{ base.url }}</a> · {{ base.owner_name }} ({{ base.owner_identity }}) · made {{ base.created_at|when }}
+  <p class="hint"><a href="{{ base.url }}">{{ base.url }}</a> · {{ base.owner_name }} ({{ base.owner_identity }}) · made {{ base.created_at|when }} · {% if base.last_report_at %}game last reported {{ base.last_report_at|when }}{% else %}game never reported{% if base.removal_due %} (removed {{ base.removal_due|when }} if it doesn't){% endif %}{% endif %}
     · {% if refresh %}reloading every {{ refresh }}s · <a href="{{ url_for('admin.base_page', slug=base.slug) }}">stop</a>{% else %}<a href="{{ url_for('admin.base_page', slug=base.slug, refresh=15) }}">reload every 15s</a>{% endif %}</p>
 </header>
 
@@ -70,6 +70,14 @@
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <label>MB <input name="quota_mb" inputmode="decimal" value="{{ (base.quota_bytes / 1048576)|round(0)|int if base.custom_quota }}" placeholder="{{ (default_quota_bytes / 1048576)|int }}" autocomplete="off"></label>
       <button>Set quota</button>
+    </form>
+
+    <form method="post" action="{{ url_for('admin.rename', slug=base.slug) }}" class="card">
+      <h3>Rename</h3>
+      <p class="hint">A new address, same data: it's stopped, its data copied and it starts again on the current image (a minute or so). The old address stops working at once: its computers need the new <code>SERVER_URL</code> (or Connect a computer again), and everyone signs in again.</p>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label><span>New name</span> <span><input name="name" required maxlength="40" pattern="[a-z0-9]([a-z0-9\-]*[a-z0-9])?" value="{{ base.slug }}" autocomplete="off">.{{ domain }}</span></label>
+      <button>Rename</button>
     </form>
 
     <form method="post" action="{{ url_for('admin.delete', slug=base.slug) }}" class="card danger-card">

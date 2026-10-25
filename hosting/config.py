@@ -43,6 +43,12 @@ GAMEDATA_SHARED_DIR = os.environ.get("GAMEDATA_SHARED_DIR", "").strip()
 # made or recreated.
 GAMEDATA_INDEX_SECONDS = int(os.environ.get("GAMEDATA_INDEX_SECONDS", "900"))
 CERT_RESOLVER = os.environ.get("CERT_RESOLVER", "le")
+# Requests per second from one IP to one base (Traefik's ratelimit), on
+# average and in a burst; past them it answers 429. Generous: the page
+# polls every second or so, and opening the Network tab on a big screen
+# loads a few hundred icons at once. 0: no limit.
+RATE_LIMIT_AVERAGE = int(os.environ.get("RATE_LIMIT_AVERAGE", "50"))
+RATE_LIMIT_BURST = int(os.environ.get("RATE_LIMIT_BURST", "500"))
 # A base with a GTNH 2.9 bundle live, a full scan and icons served holds
 # ~290 MB and peaks ~315 MB.
 MEMORY_LIMIT = os.environ.get("MEMORY_LIMIT", "512m")
@@ -62,7 +68,29 @@ QUOTA_CHECK_SECONDS = int(os.environ.get("QUOTA_CHECK_SECONDS", "300"))
 HISTORY_HOURLY_AFTER_DAYS = os.environ.get("HISTORY_HOURLY_AFTER_DAYS", "7")
 HISTORY_DAILY_AFTER_DAYS = os.environ.get("HISTORY_DAILY_AFTER_DAYS", "30")
 
+# Names a base can't be renamed to (the control panel), as they're, or
+# may become, another site's under DOMAIN - the testing instance at
+# test.DOMAIN, say. Made-up names never are (they end in digits).
+RESERVED_NAMES = {
+    n.strip()
+    for n in os.environ.get("RESERVED_NAMES", "www,test,api,app,admin,mail,smtp,traefik,hosting,status,static").split(
+        ","
+    )
+    if n.strip()
+}
+
+# Reclaiming slots (hosting/activity.py): a base the game never reported
+# to is removed this many days after it was made; one it stopped
+# reporting to is flagged after INACTIVE_DAYS, never removed by itself.
+# 0 turns either off. Checked every ACTIVITY_CHECK_SECONDS.
+NEVER_CONNECTED_DAYS = float(os.environ.get("NEVER_CONNECTED_DAYS", "7"))
+INACTIVE_DAYS = float(os.environ.get("INACTIVE_DAYS", "60"))
+ACTIVITY_CHECK_SECONDS = int(os.environ.get("ACTIVITY_CHECK_SECONDS", "3600"))
+
 MAX_BASES_PER_ACCOUNT = int(os.environ.get("MAX_BASES_PER_ACCOUNT", "1"))
+# How old a Discord account must be to make a base, so a throwaway one
+# made to grab a slot can't. 0: any age. Operators can always.
+MIN_ACCOUNT_AGE_DAYS = float(os.environ.get("MIN_ACCOUNT_AGE_DAYS", "30"))
 MAX_BASES = int(os.environ.get("MAX_BASES", "10"))
 
 
