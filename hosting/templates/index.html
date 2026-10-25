@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GTNH Craft Monitor hosting</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main>
+  <h1>GTNH Craft Monitor</h1>
+  <p class="lede">Watch your AE2 crafts, ME network and power from a browser, without running a server yourself.</p>
+
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  {% if created %}
+  <section class="created">
+    <h2>{{ created.slug }} is ready</h2>
+    <p>Your admin sign-in token. <strong>It's shown only this once</strong>: copy it now.</p>
+    <pre>{{ created.token }}</pre>
+    <ol>
+      <li>Open <a href="{{ created.url }}">{{ created.url }}</a> and sign in with the token.</li>
+      <li>Pick your GTNH version: <b>Settings (⚙) → Game data</b>.</li>
+      <li>Connect a computer in game: <b>Settings (⚙) → Status → Connect a computer</b> gives the command to paste.</li>
+    </ol>
+  </section>
+  {% endif %}
+
+  {% if account %}
+  <div class="who">Signed in as {{ account.name }}.
+    <form method="post" action="{{ url_for('pages.logout') }}" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="link">Sign out</button>
+    </form>
+  </div>
+
+  <h2>Your bases</h2>
+  {% for base in bases %}
+  <article class="base">
+    <h3><a href="{{ base.url }}">{{ base.slug }}.{{ domain }}</a> <span class="status">{{ base.status or "missing" }}</span></h3>
+    <details>
+      <summary>In-game settings</summary>
+      <p>The Connect a computer command on your base's page fills these in for you.</p>
+      <pre>SERVER_URL = "{{ base.url }}"
+API_KEY    = "{{ base.api_key }}"</pre>
+    </details>
+    <details>
+      <summary>Delete this base</summary>
+      <p>Deletes everything in it: history, users, settings. This can't be undone.</p>
+      <form method="post" action="{{ url_for('pages.delete_base', slug=base.slug) }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Type <b>{{ base.slug }}</b> to confirm <input name="confirm" autocomplete="off" required></label>
+        <button class="danger">Delete</button>
+      </form>
+    </details>
+  </article>
+  {% else %}
+  <p>None yet.</p>
+  {% endfor %}
+
+  {% if bases|length < max_bases %}
+  <h2>Make a base</h2>
+  <form method="post" action="{{ url_for('pages.create_base') }}" class="create">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Name <input name="slug" required pattern="[a-z][a-z0-9\-]{1,28}[a-z0-9]" placeholder="mybase" autocomplete="off"></label>
+    <span>.{{ domain }}</span>
+    <button>Make it</button>
+  </form>
+  <p class="hint">Starting it takes a few seconds.</p>
+  {% endif %}
+
+  {% else %}
+  {% if discord %}<p><a class="button" href="{{ url_for('pages.discord_login') }}">Sign in with Discord</a></p>{% endif %}
+  {% if dev_login %}
+  <form method="post" action="{{ url_for('pages.dev_login') }}" class="create">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Dev sign-in as <input name="name" required></label>
+    <button>Sign in</button>
+  </form>
+  {% endif %}
+  <p class="hint">Your Minecraft server needs OpenComputers' Internet Card enabled for the in-game scripts to reach this site. Some multiplayer servers turn it off.</p>
+  {% endif %}
+</main>
+</body>
+</html>

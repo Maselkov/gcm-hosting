@@ -1,0 +1,73 @@
+# gcm-hosting
+
+Hosted [GTNH Craft Monitor](https://github.com/Maselkov/gtnh-craft-monitor):
+players sign in with Discord, name a base, and get their own monitor at
+`<name>.<your domain>` without running a server.
+
+Each base is a separate, ordinary GTNH Craft Monitor server: its own
+container of the published image, with its own data volume, users,
+tokens and API key. This app only starts and removes them; it never sees
+what's inside one. Traefik routes `<name>.DOMAIN` to each base by the
+labels this app puts on its container, with a Let's Encrypt certificate
+per base.
+
+## Running it
+
+You need a host with Docker, ports 80 and 443 open, and DNS for both
+`DOMAIN` and `*.DOMAIN` pointing at it.
+
+1. Make a Discord application (https://discord.com/developers/applications),
+   and under OAuth2 add the redirect `https://DOMAIN/login/discord/callback`.
+2. `cp .env.example .env` and fill it in.
+3. `docker compose up -d --build`
+
+Open `https://DOMAIN`, sign in, make a base. The page shows the base's
+admin token once; from there the base works like any self-hosted one
+(the in-game setup is under **Settings → Status → Connect a computer**
+on the base's own page).
+
+### Shared game data
+
+Each base needs a GTNH version's game data (icons and item catalog,
+about 300 MB). Set `GAMEDATA_SHARED_DIR` to an absolute path on the host
+holding `<version>/` folders, laid out like a server's
+`data/gamedata/` (copy them from any server that downloaded them), and
+every base reads them from there, mounted read-only, instead of each
+downloading its own. Replace a folder there when its version is rebuilt.
+This needs a GTNH Craft Monitor release with `GAMEDATA_SHARED_DIR`
+(after 5.1.0); older images ignore it and download their own.
+
+### Limits
+
+Each base runs with `MEMORY_LIMIT` (256 MB), `CPU_LIMIT` (half a core)
+and 128 processes. An idle base uses about 85 MB, so a 4 GB host fits
+roughly 30 (`MAX_BASES`). `MAX_BASES_PER_ACCOUNT` defaults to 1.
+
+## Things to know before opening it to the public
+
+- **The Docker socket is root on the host.** This app needs it to start
+  and remove bases, so anyone who takes over this app takes over the
+  host. Keep it updated, and consider a socket proxy that only allows
+  the container, volume and exec calls it makes.
+- **Let's Encrypt allows 50 new certificates per domain per week.** Each
+  new base gets its own. For more, switch Traefik to a wildcard
+  certificate (DNS challenge).
+- **Players' Minecraft servers must allow the OpenComputers Internet
+  Card** to reach this host. Some multiplayer servers turn it off.
+- Bases share one Docker network and trust its subnet's
+  `X-Forwarded-*` headers. That's safe because bases never run code
+  their players supply; they're all the same image.
+- You hold players' data: say how long you keep it and how to delete it
+  (deleting a base on the page removes its container and volume).
+
+## Developing
+
+```bash
+uv venv .venv && uv pip install -p .venv -r requirements-dev.txt
+.venv/bin/python -m pytest -q
+uvx ruff check . && uvx ruff format --check .
+```
+
+`DOMAIN=localhost DEV_LOGIN=1 python app.py` runs it without Discord:
+sign in with any name. With a local Traefik on the `gcm-bases` network,
+bases answer at `http://<name>.localhost`.

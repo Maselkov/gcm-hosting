@@ -1,0 +1,54 @@
+# Traefik in front, this app at DOMAIN, and each base (started by this
+# app, not listed here) at <slug>.DOMAIN on the gcm-bases network.
+# Settings come from .env; see README.md.
+services:
+  traefik:
+    # v3.6+: older ones speak a Docker API version Docker 29 refuses.
+    image: traefik:v3.6
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=gcm-bases
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks:
+      - gcm-bases
+
+  hosting:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # Starting and removing bases needs the Docker API: whoever controls
+      # this container controls the host. See README.md.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/app/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.hosting.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.hosting.entrypoints=websecure
+      - traefik.http.routers.hosting.tls.certresolver=le
+      - traefik.http.services.hosting.loadbalancer.server.port=8000
+    networks:
+      - gcm-bases
+
+networks:
+  gcm-bases:
+    name: gcm-bases
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+volumes:
+  letsencrypt:
