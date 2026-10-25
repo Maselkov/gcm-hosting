@@ -54,8 +54,8 @@
     <h3><a href="{{ base.url }}">{{ base.slug }}.{{ domain }}</a> <span class="status">{{ "over quota" if base.suspended_at else (base.status or "missing") }}</span></h3>
     {% if base.suspended_at %}
     <p class="error">Stopped: it's using {{ base.size_bytes|bytes }}, over its {{ base.quota_bytes|bytes }} quota. Ask the host to raise it, or delete the base.</p>
-    {% else %}
-    <p class="hint">Disk: {{ base.size_bytes|bytes }} of {{ base.quota_bytes|bytes }}.</p>
+    {% elif base.size_bytes and base.size_bytes >= base.quota_bytes * 0.9 %}
+    <p class="notice">Disk: {{ base.size_bytes|bytes }} of its {{ base.quota_bytes|bytes }} quota. Over it, the base is stopped until the host raises it.</p>
     {% endif %}
     {% if base.removal_due %}
     <p class="notice">Not connected yet. If the game hasn't reported to it by {{ base.removal_due|when }}, it's removed to free the slot; connect a computer before then.</p>

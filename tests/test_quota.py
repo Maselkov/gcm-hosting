@@ -23,7 +23,10 @@ def test_a_base_over_quota_is_stopped_and_its_card_says_so(client, provisioner, 
     assert provisioner.stopped == {"big"}
     page = make_other.get("/").get_data(as_text=True)
     assert "over quota" in page and "2.0 GB" in page
-    assert "Disk: 300.0 MB of 1.0 GB" in client.get("/").get_data(as_text=True)
+    assert "Disk:" not in client.get("/").get_data(as_text=True)
+    provisioner.sizes["small"] = 950 * 1024**2
+    quota.check(provisioner)
+    assert "Disk: 950.0 MB of its 1.0 GB quota" in client.get("/").get_data(as_text=True)
     # Already stopped: not stopped again.
     assert quota.check(provisioner) == []
 
@@ -48,7 +51,7 @@ def test_an_unmeasured_base_is_left_running(client, provisioner):
     make(client, "fresh")
     assert quota.check(provisioner) == []
     assert provisioner.stopped == set()
-    assert "not measured yet" in client.get("/").get_data(as_text=True)
+    assert "Disk:" not in client.get("/").get_data(as_text=True)
 
 
 def test_one_failing_base_doesnt_stop_the_check(client, provisioner, monkeypatch):
