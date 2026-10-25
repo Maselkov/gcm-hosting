@@ -297,7 +297,7 @@ class DockerProvisioner:
 
     def make_private(self, slug):
         """Only the base's signed-in users see its crafts, network and
-        power (`app.py visibility`, from GTNH Craft Monitor 5.2 on). Its
+        power (`app.py visibility`, from GTNH Craft Monitor 6.0 on). Its
         admins can change it in Manage users after."""
         container = self.client.containers.get(container_name(slug))
         result = container.exec_run(["python", "app.py", "visibility", "private"])

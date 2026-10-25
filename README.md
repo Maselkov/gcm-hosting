@@ -74,21 +74,26 @@ or recreated, and from the control panel's **Index now**. A version
 already indexed is only checked, which takes well under a second, and a
 new one takes a couple of seconds. The control panel shows each version's
 state.
-This needs a GTNH Craft Monitor release with `GAMEDATA_SHARED_DIR`
-(after 5.1.0); older images ignore it and download their own.
+This needs GTNH Craft Monitor 6.0 or later; older images ignore
+`GAMEDATA_SHARED_DIR` and download their own.
 
 ### Limits
 
-Each base runs with `MEMORY_LIMIT` (512 MB), `CPU_LIMIT` (half a core)
-and 128 processes. A base in use (GTNH 2.9 game data live, a full scan
-of ~11k items, icons being served) holds about 290 MB, peaking around
-315 MB, and almost none of it is shared with other bases. So a 4 GB host
-fits about 10 (`MAX_BASES`). `MAX_BASES_PER_ACCOUNT` defaults to 1.
+Each base runs with `MEMORY_LIMIT` (160 MB), `CPU_LIMIT` (half a core)
+and 128 processes. A base in use on the 6.0 image (GTNH 2.9 game data
+live, a full scan of ~11k items, icons being served) holds about 54 MB,
+peaking around 80 MB, plus about 70 MB the first time it draws a chart
+(a link preview, the power graph's image). Its game data is read from
+the shared folder's index, which every base shares in the OS's cache. So
+a 4 GB host fits about 55 (`MAX_BASES`, default 10).
+`MAX_BASES_PER_ACCOUNT` defaults to 1.
 
-From the GTNH Craft Monitor release with the game data index (#119,
-#120) on, the same base holds about 54 MB, peaking around 80 MB (with the
-index pre-built in the shared folder): set `MEMORY_LIMIT=160m` and
-roughly 55 fit in 4 GB.
+Without `GAMEDATA_SHARED_DIR`, each base downloads its own game data
+and builds its own index: give it `256m`. Images before 6.0 hold about
+290 MB, peaking around 315 MB: they need `512m`.
+
+A limit applies when a base's container is made: after changing it,
+**Recreate** each base in the control panel.
 
 **Disk.** Docker can't cap a volume's size, so this app measures every
 base's data volume every `QUOTA_CHECK_SECONDS` (300) and stops one over
@@ -111,7 +116,7 @@ on a second volume that doesn't count; the base keeps at most two.
 A base can still grow past its quota between checks, so keep Docker's
 volumes (`/var/lib/docker/volumes`, or Docker's whole `data-root`) on
 their own partition: a base filling it can't take down the host or this
-app's database with it. Servers from GTNH Craft Monitor 5.2 on also
+app's database with it. Servers from GTNH Craft Monitor 6.0 on also
 refuse oversized network scans (`MAX_SCAN_ITEMS`), which stops the
 quickest way to fill one.
 
@@ -169,7 +174,7 @@ Every action is logged with who did it.
   their signed-in users see the crafts, network and power, and link
   previews show nothing. The form offers "Anyone with the link" instead,
   and owners can change it later in their base (**Manage users**). This
-  needs a GTNH Craft Monitor image from 5.2 on (`app.py visibility`);
+  needs a GTNH Craft Monitor image from 6.0 on (`app.py visibility`);
   with an older `IMAGE`, making a private base fails with a message
   saying so, and public ones still work.
 - **Players' Minecraft servers must allow the OpenComputers Internet

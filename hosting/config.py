@@ -30,7 +30,7 @@ STATS_SECONDS = int(os.environ.get("STATS_SECONDS", "10"))
 # so two instances on one Docker host (deploy/README.md) don't see or
 # touch each other's bases.
 INSTANCE = os.environ.get("INSTANCE", "gcm").strip()
-IMAGE = os.environ.get("IMAGE", "ghcr.io/maselkov/gtnh-craft-monitor:5.1")
+IMAGE = os.environ.get("IMAGE", "ghcr.io/maselkov/gtnh-craft-monitor:6.0")
 NETWORK = os.environ.get("NETWORK", "gcm-bases")
 # The network's subnet: the proxy's address is in it, so bases trust its
 # X-Forwarded-* headers.
@@ -50,8 +50,10 @@ CERT_RESOLVER = os.environ.get("CERT_RESOLVER", "le")
 RATE_LIMIT_AVERAGE = int(os.environ.get("RATE_LIMIT_AVERAGE", "50"))
 RATE_LIMIT_BURST = int(os.environ.get("RATE_LIMIT_BURST", "500"))
 # A base with a GTNH 2.9 bundle live, a full scan and icons served holds
-# ~290 MB and peaks ~315 MB.
-MEMORY_LIMIT = os.environ.get("MEMORY_LIMIT", "512m")
+# ~54 MB and peaks ~80 MB on 6.0 with its game data index pre-built
+# (GAMEDATA_SHARED_DIR), plus ~70 MB once it draws a chart. Images before
+# 6.0 need 512m: they hold ~290 MB.
+MEMORY_LIMIT = os.environ.get("MEMORY_LIMIT", "160m")
 CPU_LIMIT = float(os.environ.get("CPU_LIMIT", "0.5"))
 PIDS_LIMIT = int(os.environ.get("PIDS_LIMIT", "128"))
 
