@@ -247,3 +247,10 @@ def test_a_discord_account_must_be_old_enough(client, provisioner, monkeypatch, 
     if not allowed:
         assert "at least 30 days old" in response.get_data(as_text=True)
         assert provisioner.running == {}
+
+
+def test_the_favicon_is_served_at_the_root(client):
+    response = client.get("/favicon.ico")
+
+    assert response.status_code == 200
+    assert response.data[:4] == b"\x00\x00\x01\x00"

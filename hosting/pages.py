@@ -3,7 +3,17 @@
 import logging
 import secrets
 
-from flask import Blueprint, abort, current_app, redirect, render_template, request, session, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
 
 from hosting import activity, auth, config, db, indexer, names, provision
 
@@ -67,6 +77,12 @@ def render_index(error=None, created=None, token=None, status=200):
 @bp.route("/")
 def index():
     return render_index()
+
+
+@bp.route("/favicon.ico")
+def favicon():
+    # Browsers ask for it here whatever the page links to.
+    return send_from_directory(current_app.static_folder, "favicon.ico")
 
 
 @bp.route("/login/discord")
