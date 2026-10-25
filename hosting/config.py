@@ -26,6 +26,10 @@ ADMIN_IDENTITIES = {i.strip() for i in os.environ.get("ADMIN_IDENTITIES", "").sp
 STATS_SECONDS = int(os.environ.get("STATS_SECONDS", "10"))
 
 # Each base's container (hosting/provision.py).
+# Prefixes every base's container, volumes and router, and labels them,
+# so two instances on one Docker host (deploy/README.md) don't see or
+# touch each other's bases.
+INSTANCE = os.environ.get("INSTANCE", "gcm").strip()
 IMAGE = os.environ.get("IMAGE", "ghcr.io/maselkov/gtnh-craft-monitor:5.1")
 NETWORK = os.environ.get("NETWORK", "gcm-bases")
 # The network's subnet: the proxy's address is in it, so bases trust its

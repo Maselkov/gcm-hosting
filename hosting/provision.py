@@ -17,6 +17,10 @@ OWN_GAMEDATA_PATH = "/app/data/gamedata"
 SHARED_GAMEDATA_PATH = "/gamedata-shared"
 PORT = 8420
 LABEL = "gcm-hosting.slug"
+# Which instance (config.INSTANCE) a base's container and volumes belong
+# to. Ones without it are from before it and belong to the default, "gcm".
+INSTANCE_LABEL = "gcm-hosting.instance"
+DEFAULT_INSTANCE = "gcm"
 
 # Run inside a base by reset_admin_token(): replaces an admin's sign-in
 # token, as `app.py new-token` does, but finds the admin itself - the one
@@ -90,7 +94,7 @@ def indexer_spec():
         "image": config.IMAGE,
         "command": ["python", "-c", INDEX_SCRIPT, INDEXER_MOUNT],
         "volumes": {config.GAMEDATA_SHARED_DIR: {"bind": INDEXER_MOUNT, "mode": "rw"}},
-        "labels": {"gcm-hosting.indexer": "1"},
+        "labels": {"gcm-hosting.indexer": "1", INSTANCE_LABEL: config.INSTANCE},
         "network_disabled": True,
         # Building holds a version's whole lookup and zip directory at once.
         "mem_limit": "1g",
@@ -104,7 +108,12 @@ def started_timestamp(docker_time):
 
 
 def container_name(slug):
-    return f"gcm-base-{slug}"
+    return f"{config.INSTANCE}-base-{slug}"
+
+
+def ours(labels):
+    """Whether a container or volume with these labels is this instance's."""
+    return (labels or {}).get(INSTANCE_LABEL, DEFAULT_INSTANCE) == config.INSTANCE
 
 
 class TooOld(RuntimeError):
@@ -112,20 +121,21 @@ class TooOld(RuntimeError):
 
 
 def volume_name(slug):
-    return f"gcm-base-{slug}-data"
+    return f"{config.INSTANCE}-base-{slug}-data"
 
 
 def gamedata_volume_name(slug):
     """Game data the base downloads itself: kept apart from its data
     volume so it doesn't count toward the quota."""
-    return f"gcm-base-{slug}-gamedata"
+    return f"{config.INSTANCE}-base-{slug}-gamedata"
 
 
 def container_spec(slug, api_key):
     """docker-py's containers.run() arguments for slug's base."""
-    router = f"gcm-{slug}"
+    router = f"{config.INSTANCE}-{slug}"
     labels = {
         LABEL: slug,
+        INSTANCE_LABEL: config.INSTANCE,
         "traefik.enable": "true",
         "traefik.docker.network": config.NETWORK,
         f"traefik.http.routers.{router}.rule": f"Host(`{slug}.{config.DOMAIN}`)",
@@ -181,8 +191,10 @@ class DockerProvisioner:
 
     def create(self, slug, api_key):
         # Made first, so it carries the label volume_sizes() finds it by.
-        self.client.volumes.create(volume_name(slug), labels={LABEL: slug})
-        self.client.volumes.create(gamedata_volume_name(slug), labels={"gcm-hosting.gamedata": slug})
+        self.client.volumes.create(volume_name(slug), labels={LABEL: slug, INSTANCE_LABEL: config.INSTANCE})
+        self.client.volumes.create(
+            gamedata_volume_name(slug), labels={"gcm-hosting.gamedata": slug, INSTANCE_LABEL: config.INSTANCE}
+        )
         self.client.containers.run(**container_spec(slug, api_key))
 
     def create_admin(self, slug, name, timeout=60):
@@ -242,6 +254,8 @@ class DockerProvisioner:
         cpu_limit_percent}} for every base's container."""
         out = {}
         for container in self.client.containers.list(all=True, filters={"label": LABEL}):
+            if not ours(container.labels):
+                continue
             state = container.attrs.get("State") or {}
             out[container.labels[LABEL]] = {
                 "status": container.status,
@@ -320,7 +334,8 @@ class DockerProvisioner:
         them (it walks each volume, so not every request)."""
         sizes = {}
         for volume in self.client.df().get("Volumes") or []:
-            slug = (volume.get("Labels") or {}).get(LABEL)
+            labels = volume.get("Labels") or {}
+            slug = labels.get(LABEL) if ours(labels) else None
             size = (volume.get("UsageData") or {}).get("Size", -1)
             if slug and size >= 0:
                 sizes[slug] = size

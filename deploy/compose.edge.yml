@@ -1,0 +1,48 @@
+# Traefik for every instance on this host (deploy/README.md): the only
+# thing on ports 80 and 443, routing DOMAIN and *.DOMAIN of each one by
+# the labels on its containers. Makes the networks they join, as in
+# docker-compose.yml: the apps on gcm-control, their bases on gcm-bases,
+# and only Traefik on both.
+# Settings from edge/.env: ACME_EMAIL, CF_DNS_API_TOKEN[, ACME_CA_SERVER].
+services:
+  traefik:
+    # v3.6+: older ones speak a Docker API version Docker 29 refuses.
+    image: traefik:v3.6
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=gcm-bases
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.websecure.address=:443
+      # One wildcard certificate per instance, proven through Cloudflare's
+      # DNS, as in docker-compose.yml.
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:?}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.caserver=${ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      - --certificatesresolvers.le.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks:
+      - gcm-bases
+      - gcm-control
+
+networks:
+  gcm-bases:
+    name: gcm-bases
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+  gcm-control:
+    name: gcm-control
+
+volumes:
+  letsencrypt:

@@ -3,7 +3,8 @@ name: Publish image
 # Pushes the image to ghcr.io/<owner>/<repo>: main -> latest and main;
 # v1.2.3 -> 1.2.3 and 1.2; every push -> sha-<short>. No Actions cache
 # anywhere here (cache poisoning): the tests install without pip's, and
-# the build caches in the registry instead.
+# the build caches in the registry instead. Then deploys it (deploy.yml):
+# a tag to production, main or a branch run by hand to testing.
 on:
   push:
     branches: [main]
@@ -69,3 +70,9 @@ jobs:
           # isn't.
           cache-from: type=registry,ref=ghcr.io/maselkov/gcm-hosting:buildcache
           cache-to: type=registry,ref=ghcr.io/maselkov/gcm-hosting:buildcache,mode=max
+
+  deploy:
+    needs: publish
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: ${{ github.ref_type == 'tag' && 'production' || 'testing' }}

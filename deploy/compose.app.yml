@@ -1,0 +1,42 @@
+# One instance of this app (deploy/README.md), behind the edge's Traefik.
+# deploy.sh copies it into that instance's folder with the release's
+# image in place of APP_IMAGE, and runs it as project
+# gcm-<testing|production>. Everything else comes from the folder's .env,
+# which needs INSTANCE and DOMAIN besides the app's own.
+services:
+  hosting:
+    image: ${APP_IMAGE:?}
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # Starting and removing bases needs the Docker API: whoever controls
+      # this container controls the host. See README.md.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      start_interval: 2s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.${INSTANCE:?}.rule=Host(`${DOMAIN:?}`)
+      - traefik.http.routers.${INSTANCE}.entrypoints=websecure
+      - traefik.http.routers.${INSTANCE}.tls.certresolver=le
+      # Every base's router names the same two, so they share this one.
+      - traefik.http.routers.${INSTANCE}.tls.domains[0].main=${DOMAIN}
+      - traefik.http.routers.${INSTANCE}.tls.domains[0].sans=*.${DOMAIN}
+      - traefik.http.services.${INSTANCE}.loadbalancer.server.port=8000
+      - traefik.docker.network=gcm-control
+      # Sign-in and the forms: far less than a base needs.
+      - traefik.http.middlewares.${INSTANCE}-ratelimit.ratelimit.average=10
+      - traefik.http.middlewares.${INSTANCE}-ratelimit.ratelimit.burst=50
+      - traefik.http.routers.${INSTANCE}.middlewares=${INSTANCE}-ratelimit
+    networks:
+      - gcm-control
+
+networks:
+  gcm-control:
+    external: true

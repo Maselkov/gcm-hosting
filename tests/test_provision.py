@@ -34,3 +34,21 @@ def test_without_shared_game_data_each_base_has_only_its_own_volume(monkeypatch)
     spec = provision.container_spec("bob", "k" * 64)
     assert "GAMEDATA_SHARED_DIR" not in spec["environment"]
     assert list(spec["volumes"]) == ["gcm-base-bob-data", "gcm-base-bob-gamedata"]
+
+
+def test_a_second_instance_names_and_labels_its_own_bases(monkeypatch):
+    monkeypatch.setattr(config, "INSTANCE", "gcm-test")
+    monkeypatch.setattr(config, "GAMEDATA_SHARED_DIR", "")
+    spec = provision.container_spec("carol", "k" * 64)
+    assert spec["name"] == "gcm-test-base-carol"
+    assert list(spec["volumes"]) == ["gcm-test-base-carol-data", "gcm-test-base-carol-gamedata"]
+    assert spec["labels"][provision.INSTANCE_LABEL] == "gcm-test"
+    assert "traefik.http.routers.gcm-test-carol.rule" in spec["labels"]
+    assert provision.indexer_spec()["labels"][provision.INSTANCE_LABEL] == "gcm-test"
+
+
+def test_each_instance_sees_only_its_own_bases(monkeypatch):
+    test, prod, old = {provision.INSTANCE_LABEL: "gcm-test"}, {provision.INSTANCE_LABEL: "gcm"}, {}
+    assert provision.ours(prod) and provision.ours(old) and not provision.ours(test)
+    monkeypatch.setattr(config, "INSTANCE", "gcm-test")
+    assert provision.ours(test) and not provision.ours(prod) and not provision.ours(old)

@@ -1,0 +1,57 @@
+name: Deploy
+
+# Deploys this ref's published image to testing or production on the
+# server, from the self-hosted runner over SSH (deploy/README.md): a v*
+# tag as its version, anything else as sha-<short>. publish.yml calls it
+# once the image is up; run it by hand on an older v* tag, for
+# production, to roll back without rebuilding.
+#
+# The key only exists in the environments' secrets, which GitHub hands to
+# this job alone, and only for the refs each environment allows. On the
+# server it can run nothing but deploy.sh.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [testing, production]
+        default: testing
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, gcm-deploy]
+    timeout-minutes: 15
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://${{ vars.DOMAIN }}
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Deploy over SSH
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+        run: |
+          # The tags publish.yml gives this ref's image.
+          if [[ $GITHUB_REF_TYPE == tag ]]; then tag=${GITHUB_REF_NAME#v}; else tag=sha-${GITHUB_SHA::7}; fi
+          dir=$(mktemp -d)
+          trap 'rm -rf "$dir"' EXIT
+          (umask 077 && printf '%s\n' "$SSH_KEY" >"$dir/key")
+          printf '%s\n' "$KNOWN_HOSTS" >"$dir/known_hosts"
+          ssh -i "$dir/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$ENVIRONMENT $tag"

@@ -47,6 +47,10 @@ tag); to use it instead of
 building, put `image: ghcr.io/maselkov/gcm-hosting:latest` in place of
 `build: .` in `docker-compose.yml`.
 
+To have CI deploy it instead, a testing and a production instance on
+one server from a self-hosted runner, see
+[deploy/README.md](deploy/README.md).
+
 Open `https://DOMAIN`, sign in, make a base. The page shows the base's
 admin token once; from there the base works like any self-hosted one
 (the in-game setup is under **Settings → Status → Connect a computer**
