@@ -1,31 +1,22 @@
 """The pages: sign in, your bases, make one, delete one."""
 
 import logging
-import re
 import secrets
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, session, url_for
 
-from hosting import auth, config, db, indexer
+from hosting import auth, config, db, indexer, names
 
 bp = Blueprint("pages", __name__)
 log = logging.getLogger("hosting")
 
-# A DNS label: the base's subdomain.
-SLUG_RE = re.compile(r"^[a-z][a-z0-9-]{1,28}[a-z0-9]$")
-RESERVED = {"www", "api", "app", "admin", "mail", "smtp", "traefik", "hosting", "status", "static"}
+# Names to try before giving up: with ~655 million of them, a second is
+# already unlikely.
+NAME_TRIES = 5
 
 
 def provisioner():
     return current_app.config["PROVISIONER"]
-
-
-def slug_problem(slug):
-    if not SLUG_RE.match(slug) or "--" in slug:
-        return "Use 3 to 30 lowercase letters, digits and dashes, starting with a letter."
-    if slug in RESERVED:
-        return "That name is reserved."
-    return None
 
 
 def human_bytes(n):
@@ -113,12 +104,14 @@ def logout():
 def create_base():
     auth.check_csrf()
     account = auth.current_account()
-    slug = request.form.get("slug", "").strip().lower()
-    problem = slug_problem(slug)
-    if problem:
-        return render_index(error=problem, status=400)
     api_key = secrets.token_hex(32)
-    problem = db.claim_base(slug, account["id"], api_key)
+    for _ in range(NAME_TRIES):
+        slug = names.generate()
+        problem = db.claim_base(slug, account["id"], api_key)
+        if problem != db.NAME_TAKEN:
+            break
+    else:
+        problem = "Couldn't find a free name. Try again."
     if problem:
         return render_index(error=problem, status=409)
     try:

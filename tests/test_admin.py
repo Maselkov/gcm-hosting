@@ -1,5 +1,5 @@
 import pytest
-from conftest import csrf, sign_in
+from conftest import csrf, make_base, sign_in
 
 from hosting import config, db, quota, stats
 
@@ -7,7 +7,7 @@ MB = 1024**2
 
 
 def make(client, slug):
-    assert client.post("/bases", data={"slug": slug, "csrf": csrf(client)}).status_code == 201
+    assert make_base(client, slug).status_code == 201
 
 
 @pytest.fixture()

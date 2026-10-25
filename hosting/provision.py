@@ -130,6 +130,12 @@ def container_spec(slug, api_key):
     if config.DOMAIN != "localhost":
         labels[f"traefik.http.routers.{router}.entrypoints"] = "websecure"
         labels[f"traefik.http.routers.{router}.tls.certresolver"] = config.CERT_RESOLVER
+        # The one wildcard certificate this app's own router asks for
+        # (docker-compose.yml), not one per base: Traefik sees it already
+        # has it. So there's nothing new to issue when a base is made, and
+        # base names stay out of the public certificate logs.
+        labels[f"traefik.http.routers.{router}.tls.domains[0].main"] = config.DOMAIN
+        labels[f"traefik.http.routers.{router}.tls.domains[0].sans"] = f"*.{config.DOMAIN}"
     environment = {
         "API_KEY": api_key,
         "PUBLIC_URL": config.base_url(slug),

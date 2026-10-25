@@ -10,6 +10,8 @@ def test_a_base_container_is_routed_limited_and_isolated(monkeypatch):
     labels = spec["labels"]
     assert labels["traefik.http.routers.gcm-alice.rule"] == "Host(`alice.example.net`)"
     assert labels["traefik.http.routers.gcm-alice.tls.certresolver"] == "le"
+    assert labels["traefik.http.routers.gcm-alice.tls.domains[0].main"] == "example.net"
+    assert labels["traefik.http.routers.gcm-alice.tls.domains[0].sans"] == "*.example.net"
     assert labels["traefik.http.services.gcm-alice.loadbalancer.server.port"] == "8420"
     env = spec["environment"]
     assert env["API_KEY"] == "k" * 64

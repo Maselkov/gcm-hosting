@@ -152,6 +152,9 @@ def set_quota(slug, quota_bytes):
         return conn.execute("UPDATE bases SET quota_bytes = ? WHERE slug = ?", (quota_bytes, slug)).rowcount == 1
 
 
+NAME_TAKEN = "That name is taken."
+
+
 def claim_base(slug, owner_id, api_key):
     """Records a new base, unless the slug is taken or a limit is reached.
     Returns None, or why not."""
@@ -169,7 +172,7 @@ def claim_base(slug, owner_id, api_key):
                 (slug, owner_id, api_key, time.time()),
             )
     except sqlite3.IntegrityError:
-        return "That name is taken."
+        return NAME_TAKEN
     return None
 
 

@@ -1,4 +1,4 @@
-from conftest import csrf, sign_in
+from conftest import make_base, sign_in
 
 from hosting import config, db, quota
 
@@ -6,7 +6,7 @@ GB = 1024**3
 
 
 def make(client, slug):
-    assert client.post("/bases", data={"slug": slug, "csrf": csrf(client)}).status_code == 201
+    assert make_base(client, slug).status_code == 201
 
 
 def test_a_base_over_quota_is_stopped_and_its_card_says_so(client, provisioner, monkeypatch):

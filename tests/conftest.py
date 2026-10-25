@@ -1,8 +1,9 @@
 import re
+from unittest import mock
 
 import pytest
 
-from hosting import config, create_app, indexer
+from hosting import config, create_app, indexer, names
 
 
 class FakeProvisioner:
@@ -126,3 +127,9 @@ def csrf(client):
 def sign_in(client, name):
     response = client.post("/login/dev", data={"name": name, "csrf": csrf(client)})
     assert response.status_code == 302
+
+
+def make_base(client, slug):
+    """Makes a base named slug, in place of a made-up name."""
+    with mock.patch.object(names, "generate", return_value=slug):
+        return client.post("/bases", data={"csrf": csrf(client)})

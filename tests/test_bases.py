@@ -1,17 +1,16 @@
+import re
+from unittest import mock
+
 import pytest
-from conftest import csrf, sign_in
+from conftest import csrf, make_base, sign_in
 
-from hosting import config, db
-
-
-def make(client, slug):
-    return client.post("/bases", data={"slug": slug, "csrf": csrf(client)})
+from hosting import config, db, names
 
 
 def test_a_new_base_is_started_and_its_admin_token_shown_once(client, provisioner):
     sign_in(client, "Alice")
 
-    response = make(client, "alicebase")
+    response = make_base(client, "alicebase")
 
     assert response.status_code == 201
     page = response.get_data(as_text=True)
@@ -24,32 +23,47 @@ def test_a_new_base_is_started_and_its_admin_token_shown_once(client, provisione
     assert api_key in later and "running" in later
 
 
-@pytest.mark.parametrize("slug", ["ab", "1base", "base-", "a--b", "has space", "UPPER!", "www", "x" * 31])
-def test_bad_and_reserved_names_are_refused(client, provisioner, slug):
+def test_a_base_gets_a_made_up_name(client, provisioner):
     sign_in(client, "Alice")
-    assert make(client, slug).status_code == 400
-    assert provisioner.running == {}
+
+    response = client.post("/bases", data={"csrf": csrf(client)})
+
+    assert response.status_code == 201
+    (slug,) = provisioner.running
+    assert re.fullmatch(r"[a-z]+-[a-z]+-[0-9]{4}", slug)
+    assert f"https://{slug}.example.test" in response.get_data(as_text=True)
 
 
-def test_a_taken_name_is_refused(client, app):
+def test_a_name_already_taken_is_passed_over(client, app, provisioner):
     sign_in(client, "Alice")
-    make(client, "shared")
+    make_base(client, "copper-falcon-4821")
     other = app.test_client()
     sign_in(other, "Bob")
-    response = make(other, "shared")
-    assert response.status_code == 409
-    assert "taken" in response.get_data(as_text=True)
+
+    with mock.patch.object(names, "generate", side_effect=["copper-falcon-4821", "quiet-rook-4833"]):
+        response = other.post("/bases", data={"csrf": csrf(other)})
+
+    assert response.status_code == 201
+    assert set(provisioner.running) == {"copper-falcon-4821", "quiet-rook-4833"}
+
+
+def test_the_word_lists_make_valid_distinct_dns_labels():
+    assert len(set(names.ADJECTIVES)) == len(names.ADJECTIVES) == 256
+    assert len(set(names.NOUNS)) == len(names.NOUNS) == 256
+    longest = max(map(len, names.ADJECTIVES)) + max(map(len, names.NOUNS)) + len("--0000")
+    assert longest <= 63
+    assert all(w.isascii() and w.isalpha() and w.islower() for w in names.ADJECTIVES + names.NOUNS)
 
 
 def test_limits_per_account_and_per_host(client, app, monkeypatch):
     sign_in(client, "Alice")
-    assert make(client, "first").status_code == 201
-    assert make(client, "second").status_code == 409
+    assert make_base(client, "first").status_code == 201
+    assert make_base(client, "second").status_code == 409
 
     monkeypatch.setattr(config, "MAX_BASES", 1)
     other = app.test_client()
     sign_in(other, "Bob")
-    response = make(other, "bobs")
+    response = make_base(other, "bobs")
     assert response.status_code == 409
     assert "full" in response.get_data(as_text=True)
 
@@ -57,16 +71,16 @@ def test_limits_per_account_and_per_host(client, app, monkeypatch):
 def test_a_base_that_fails_to_start_is_cleaned_up(client, provisioner):
     sign_in(client, "Alice")
     provisioner.fail_admin = True
-    assert make(client, "broken").status_code == 500
+    assert make_base(client, "broken").status_code == 500
     assert provisioner.running == {}
     assert db.owner_of("broken") is None
     provisioner.fail_admin = False
-    assert make(client, "broken").status_code == 201
+    assert make_base(client, "broken").status_code == 201
 
 
 def test_deleting_needs_the_name_typed_and_removes_everything(client, provisioner):
     sign_in(client, "Alice")
-    make(client, "doomed")
+    make_base(client, "doomed")
     url = "/bases/doomed/delete"
     assert client.post(url, data={"confirm": "nope", "csrf": csrf(client)}).status_code == 400
     assert "doomed" in provisioner.running
@@ -78,7 +92,7 @@ def test_deleting_needs_the_name_typed_and_removes_everything(client, provisione
 
 def test_only_the_owner_can_delete(client, app, provisioner):
     sign_in(client, "Alice")
-    make(client, "mine")
+    make_base(client, "mine")
     other = app.test_client()
     sign_in(other, "Bob")
     response = other.post("/bases/mine/delete", data={"confirm": "mine", "csrf": csrf(other)})
@@ -88,13 +102,13 @@ def test_only_the_owner_can_delete(client, app, provisioner):
 
 def test_forms_need_the_csrf_token(client, provisioner):
     sign_in(client, "Alice")
-    assert client.post("/bases", data={"slug": "nocsrf"}).status_code == 400
-    assert client.post("/bases", data={"slug": "nocsrf", "csrf": "wrong"}).status_code == 400
+    assert client.post("/bases", data={}).status_code == 400
+    assert client.post("/bases", data={"csrf": "wrong"}).status_code == 400
     assert provisioner.running == {}
 
 
 def test_signed_out_requests_make_nothing(client, provisioner):
-    assert client.post("/bases", data={"slug": "anon", "csrf": csrf(client)}).status_code == 302
+    assert client.post("/bases", data={"csrf": csrf(client)}).status_code == 302
     assert provisioner.running == {}
 
 

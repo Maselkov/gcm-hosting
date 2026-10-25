@@ -1,25 +1,45 @@
 # gcm-hosting
 
 Hosted [GTNH Craft Monitor](https://github.com/Maselkov/gtnh-craft-monitor):
-players sign in with Discord, name a base, and get their own monitor at
-`<name>.<your domain>` without running a server.
+players sign in with Discord, make a base, and get their own monitor at
+an address like `copper-falcon-4821.<your domain>` without running a
+server.
 
 Each base is a separate, ordinary GTNH Craft Monitor server: its own
 container of the published image, with its own data volume, users,
 tokens and API key. This app only starts and removes them; it never sees
 what's inside one. Traefik routes `<name>.DOMAIN` to each base by the
-labels this app puts on its container, with a Let's Encrypt certificate
-per base.
+labels this app puts on its container, all under one Let's Encrypt
+wildcard certificate.
 
 ## Running it
 
-You need a host with Docker, ports 80 and 443 open, and DNS for both
-`DOMAIN` and `*.DOMAIN` pointing at it.
+You need a host with Docker and ports 80 and 443 open, and `DOMAIN`'s
+DNS on Cloudflare (`DOMAIN` can be a subdomain, like `gcm.example.com`).
 
-1. Make a Discord application (https://discord.com/developers/applications),
+1. In Cloudflare, add two records pointing at the host: `DOMAIN` and
+   `*.DOMAIN` (for `gcm.example.com`, the names `gcm` and `*.gcm`).
+   Make them **DNS only** (grey cloud), not proxied: Cloudflare's free
+   certificate doesn't cover a wildcard below a subdomain, and Traefik
+   serves its own.
+2. Make a Cloudflare API token (My Profile → API Tokens → Create Token →
+   the "Edit zone DNS" template) with **Zone / DNS / Edit** and
+   **Zone / Zone / Read**, for that zone only. Traefik uses it to add the
+   TXT record that proves the certificate is yours.
+3. Make a Discord application (https://discord.com/developers/applications),
    and under OAuth2 add the redirect `https://DOMAIN/login/discord/callback`.
-2. `cp .env.example .env` and fill it in.
-3. `docker compose up -d --build`
+4. `cp .env.example .env` and fill it in, the token as `CF_DNS_API_TOKEN`.
+5. `docker compose up -d --build`
+
+Traefik then gets one certificate for `DOMAIN` and `*.DOMAIN`, which takes
+a minute or so, and renews it by itself. Every base uses it, so making a
+base never asks Let's Encrypt for anything, and the public certificate
+logs (which anyone can search) show only those two names, not the
+bases'. To try it without using up Let's Encrypt's limits, set
+`ACME_CA_SERVER` to its staging CA (see `.env.example`) first; delete
+the `letsencrypt` volume before switching back. For a DNS provider other
+than Cloudflare, change the provider and its settings in
+`docker-compose.yml`.
 
 `publish.yml` publishes the image as `ghcr.io/maselkov/gcm-hosting` once
 the tests pass (`latest` from `main`, `1.2.3` and `1.2` from a `v1.2.3`
@@ -130,9 +150,12 @@ Every action is logged with who did it.
   and remove bases, so anyone who takes over this app takes over the
   host. Keep it updated, and consider a socket proxy that only allows
   the container, volume and exec calls it makes.
-- **Let's Encrypt allows 50 new certificates per domain per week.** Each
-  new base gets its own. For more, switch Traefik to a wildcard
-  certificate (DNS challenge).
+- **Bases' addresses are made up** (`<adjective>-<noun>-<4 digits>`,
+  about 655 million of them), so nobody can take a name like `official`,
+  pass for someone else, or claim a deleted base's address. With the
+  wildcard certificate, they can't be listed either. That isn't access
+  control, though: a base is readable by anyone with its address, and
+  addresses get shared.
 - **Players' Minecraft servers must allow the OpenComputers Internet
   Card** to reach this host. Some multiplayer servers turn it off.
 - Bases share one Docker network and trust its subnet's

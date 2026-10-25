@@ -13,9 +13,18 @@ services:
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.websecure.address=:443
+      # One certificate for DOMAIN and *.DOMAIN, proven through
+      # Cloudflare's DNS: a wildcard can only be had by the DNS challenge.
+      # Another DNS provider: its name from
+      # https://doc.traefik.io/traefik/https/acme/#providers here, and its
+      # settings under environment.
       - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
-      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.caserver=${ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      - --certificatesresolvers.le.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
     ports:
       - "80:80"
       - "443:443"
@@ -39,6 +48,9 @@ services:
       - traefik.http.routers.hosting.rule=Host(`${DOMAIN}`)
       - traefik.http.routers.hosting.entrypoints=websecure
       - traefik.http.routers.hosting.tls.certresolver=le
+      # Every base's router names the same two, so they share this one.
+      - traefik.http.routers.hosting.tls.domains[0].main=${DOMAIN}
+      - traefik.http.routers.hosting.tls.domains[0].sans=*.${DOMAIN}
       - traefik.http.services.hosting.loadbalancer.server.port=8000
     networks:
       - gcm-bases
