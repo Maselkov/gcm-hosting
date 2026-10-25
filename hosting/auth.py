@@ -31,6 +31,23 @@ def login_required(view):
     return wrapped
 
 
+def is_operator(account):
+    return account is not None and account.get("identity") in config.ADMIN_IDENTITIES
+
+
+def operator_required(view):
+    """The control panel's pages: 404 for anyone else, so it isn't
+    advertised."""
+
+    @functools.wraps(view)
+    def wrapped(*args, **kwargs):
+        if not is_operator(current_account()):
+            abort(404)
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
 def csrf_token():
     if "csrf" not in session:
         session["csrf"] = secrets.token_urlsafe(24)

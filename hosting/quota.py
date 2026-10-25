@@ -16,7 +16,8 @@ log = logging.getLogger("hosting.quota")
 
 def check(provisioner):
     """Measures every base, stops the ones over quota and starts the
-    stopped ones back up that fit again. Returns the slugs stopped."""
+    stopped ones back up that fit again - unless the host stopped them
+    too (the control panel). Returns the slugs stopped."""
     sizes = provisioner.volume_sizes()
     stopped = []
     for base in db.all_bases():
@@ -40,8 +41,10 @@ def _check_one(provisioner, base, sizes):
         provisioner.stop(slug)
         suspended_at = time.time()
     elif not over and suspended_at is not None:
-        log.info("Starting %s again: %s bytes fits its quota of %s", slug, size, base["quota_bytes"])
-        provisioner.start(slug)
+        # Fits again. Stopped by the host too, it stays stopped.
+        if base["held_at"] is None:
+            log.info("Starting %s again: %s bytes fits its quota of %s", slug, size, base["quota_bytes"])
+            provisioner.start(slug)
         suspended_at = None
     db.record_size(slug, size, suspended_at)
     return stopping

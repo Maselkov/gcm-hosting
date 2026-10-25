@@ -15,6 +15,11 @@ DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
 DISCORD_API_URL = os.environ.get("DISCORD_API_URL", "https://discord.com/api").rstrip("/")
 # Sign in as anyone by name, without Discord. For local testing only.
 DEV_LOGIN = os.environ.get("DEV_LOGIN", "") == "1"
+# Who may use the control panel (/admin): comma-separated identities, as
+# accounts sign in - "discord:<user id>", or "dev:<name>" with DEV_LOGIN.
+ADMIN_IDENTITIES = {i.strip() for i in os.environ.get("ADMIN_IDENTITIES", "").split(",") if i.strip()}
+# How often the control panel's CPU and memory figures are read.
+STATS_SECONDS = int(os.environ.get("STATS_SECONDS", "10"))
 
 # Each base's container (hosting/provision.py).
 IMAGE = os.environ.get("IMAGE", "ghcr.io/maselkov/gtnh-craft-monitor:5.1")

@@ -58,6 +58,7 @@ def render_index(error=None, created=None, status=200):
             dev_login=config.DEV_LOGIN,
             discord=bool(config.DISCORD_CLIENT_ID),
             max_bases=config.MAX_BASES_PER_ACCOUNT,
+            operator=auth.is_operator(account),
         ),
         status,
     )

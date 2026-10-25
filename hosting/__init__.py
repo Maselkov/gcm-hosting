@@ -6,7 +6,7 @@ import datetime
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from hosting import config, db, pages
+from hosting import admin, config, db, pages
 
 CSP = (
     "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
@@ -34,6 +34,7 @@ def create_app(provisioner=None):
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     db.init()
     app.register_blueprint(pages.bp)
+    app.register_blueprint(admin.bp)
 
     @app.after_request
     def headers(response):

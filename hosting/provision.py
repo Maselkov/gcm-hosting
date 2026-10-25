@@ -6,6 +6,8 @@ data live in its volume, and this app only starts, stops and removes it.
 Bases never run code their players supply, so sharing one network is
 safe; the limits keep one busy base from starving the rest."""
 
+import datetime
+import json
 import time
 
 from hosting import config
@@ -15,6 +17,38 @@ OWN_GAMEDATA_PATH = "/app/data/gamedata"
 SHARED_GAMEDATA_PATH = "/gamedata-shared"
 PORT = 8420
 LABEL = "gcm-hosting.slug"
+
+# Run inside a base by reset_admin_token(): replaces an admin's sign-in
+# token, as `app.py new-token` does, but finds the admin itself - the one
+# named, else the oldest enabled one - and makes one if there's none.
+# Prints {name, token} or {error, admins} as its last line.
+RESET_ADMIN_SCRIPT = """
+import json, sys
+from gcm import create_app, store
+create_app()
+name = sys.argv[1]
+admins = sorted((u for u in store.users.all_with_tokens() if u["role"] == "admin" and not u["disabled_at"]),
+                key=lambda u: u["created_at"])
+if not admins and not name:
+    name = "Admin"
+if name and not any(u["display_name"] == name for u in admins):
+    if admins:
+        print(json.dumps({"error": f"No admin named {name!r}", "admins": [u["display_name"] for u in admins]}))
+        sys.exit(1)
+    created = store.users.create(name, "admin")
+    if not created:
+        print(json.dumps({"error": f"{name!r} is taken by a user who isn't an admin", "admins": []}))
+        sys.exit(1)
+    print(json.dumps({"name": name, "token": created[1], "created": True}))
+    sys.exit(0)
+pick = next(u for u in admins if u["display_name"] == name) if name else admins[0]
+print(json.dumps({"name": pick["display_name"], "token": store.users.replace_credentials(pick["id"])}))
+"""
+
+
+def started_timestamp(docker_time):
+    """Docker's "2026-10-25T12:46:52.128342874Z" as whole Unix seconds."""
+    return int(datetime.datetime.fromisoformat(docker_time[:19]).replace(tzinfo=datetime.UTC).timestamp())
 
 
 def container_name(slug):
@@ -93,20 +127,111 @@ class DockerProvisioner:
         """Makes the base's first admin and returns their sign-in token.
         Waits for the server to finish starting, so the two don't both
         create the databases."""
+        container = self._started(slug, timeout)
+        result = container.exec_run(["python", "app.py", "create-admin", name])
+        output = result.output.decode(errors="replace").strip()
+        if result.exit_code != 0:
+            raise RuntimeError(f"create-admin failed for {slug}: {output}")
+        return output.splitlines()[-1]
+
+    def _started(self, slug, timeout=60):
+        """slug's container once its server is serving. Only the logs since
+        it last started count: a restarted one still has the old run's."""
         container = self.client.containers.get(container_name(slug))
+        started = started_timestamp(container.attrs["State"]["StartedAt"])
         deadline = time.monotonic() + timeout
-        while b"Serving on" not in container.logs():
+        while b"Serving on" not in container.logs(since=started):
             if time.monotonic() > deadline:
                 raise RuntimeError(f"{slug} didn't start within {timeout}s")
             container.reload()
             if container.status == "exited":
                 raise RuntimeError(f"{slug} exited while starting")
             time.sleep(0.5)
-        result = container.exec_run(["python", "app.py", "create-admin", name])
-        output = result.output.decode(errors="replace").strip()
-        if result.exit_code != 0:
-            raise RuntimeError(f"create-admin failed for {slug}: {output}")
-        return output.splitlines()[-1]
+        return container
+
+    def reset_admin_token(self, slug, name=""):
+        """Replaces an admin's sign-in token (see RESET_ADMIN_SCRIPT).
+        Returns {name, token[, created]}, or raises ValueError with what
+        went wrong and the base's admins."""
+        container = self._started(slug)
+        result = container.exec_run(["python", "-c", RESET_ADMIN_SCRIPT, name])
+        lines = result.output.decode(errors="replace").strip().splitlines()
+        try:
+            answer = json.loads(lines[-1])
+        except (IndexError, ValueError):
+            raise RuntimeError(f"resetting {slug}'s admin token failed: {' '.join(lines[-3:])}") from None
+        if "error" in answer:
+            admins = ", ".join(answer["admins"]) or "none"
+            raise ValueError(f"{answer['error']}. Its admins: {admins}.")
+        return answer
+
+    def details(self):
+        """{slug: {status, image, started_at, restarts, oom_killed,
+        cpu_limit_percent}} for every base's container."""
+        out = {}
+        for container in self.client.containers.list(all=True, filters={"label": LABEL}):
+            state = container.attrs.get("State") or {}
+            out[container.labels[LABEL]] = {
+                "status": container.status,
+                "image": (container.attrs.get("Config") or {}).get("Image"),
+                "started_at": state.get("StartedAt") if container.status == "running" else None,
+                "restarts": container.attrs.get("RestartCount", 0),
+                "oom_killed": bool(state.get("OOMKilled")),
+                # Of one core, like the CPU figures: 0.5 cores is 50.
+                "cpu_limit_percent": ((container.attrs.get("HostConfig") or {}).get("NanoCpus") or 0) / 1e7 or None,
+            }
+        return out
+
+    def sample(self, slug):
+        """One reading of slug's container: (cpu_total_ns, system_total_ns,
+        online_cpus, memory_bytes, memory_limit_bytes), or None if it isn't
+        running. CPU is turned into a percentage between two readings
+        (hosting/stats.py); memory is what Docker's own stats show (usage
+        less reclaimable file cache)."""
+        try:
+            s = self.client.containers.get(container_name(slug)).stats(stream=False, one_shot=True)
+        except self.errors.NotFound:
+            return None
+        cpu, memory = s.get("cpu_stats") or {}, s.get("memory_stats") or {}
+        if not memory.get("usage"):
+            return None
+        used = memory["usage"] - (memory.get("stats") or {}).get("inactive_file", 0)
+        return (
+            (cpu.get("cpu_usage") or {}).get("total_usage", 0),
+            cpu.get("system_cpu_usage", 0),
+            cpu.get("online_cpus") or 1,
+            used,
+            memory.get("limit"),
+        )
+
+    def host(self):
+        """{cpus, memory_bytes} of the Docker host."""
+        info = self.client.info()
+        return {"cpus": info.get("NCPU"), "memory_bytes": info.get("MemTotal")}
+
+    def logs(self, slug, lines=200):
+        try:
+            return self.client.containers.get(container_name(slug)).logs(tail=lines).decode(errors="replace")
+        except self.errors.NotFound:
+            return ""
+
+    def restart(self, slug):
+        self.client.containers.get(container_name(slug)).restart()
+
+    def recreate(self, slug, api_key):
+        """A new container for slug from the current IMAGE (pulled first)
+        and settings, on the same volumes: an upgrade."""
+        repository, _, tag = config.IMAGE.rpartition(":")
+        if repository and "/" not in tag:
+            try:
+                self.client.images.pull(repository, tag=tag)
+            except self.errors.APIError:
+                pass  # a local-only image: use it as it is
+        try:
+            self.client.containers.get(container_name(slug)).remove(force=True)
+        except self.errors.NotFound:
+            pass
+        self.client.containers.run(**container_spec(slug, api_key))
 
     def volume_sizes(self):
         """{slug: bytes} for every base's data volume, as Docker measures

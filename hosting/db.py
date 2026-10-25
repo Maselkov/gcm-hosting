@@ -29,9 +29,14 @@ CREATE TABLE IF NOT EXISTS bases (
     -- Its data volume's size at the last check.
     size_bytes INTEGER,
     -- Set while it's stopped for being over quota.
-    suspended_at REAL
+    suspended_at REAL,
+    -- Set while the host has stopped it (the control panel): it stays
+    -- stopped until started there, whatever its quota.
+    held_at REAL
 );
 """
+# Columns added since a table was first made: (table, column, definition).
+ADDED_COLUMNS = [("bases", "held_at", "REAL")]
 
 
 def path():
@@ -50,6 +55,10 @@ def init():
     os.makedirs(config.DATA_DIR, exist_ok=True)
     with transaction() as conn:
         conn.executescript(SCHEMA)
+        for table, column, definition in ADDED_COLUMNS:
+            columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            if column not in columns:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def account_for(identity, name):
@@ -70,29 +79,37 @@ def account_for(identity, name):
 
 def account(account_id):
     with transaction() as conn:
-        row = conn.execute("SELECT id, name FROM accounts WHERE id = ?", (account_id,)).fetchone()
-    return {"id": row[0], "name": row[1]} if row else None
+        row = conn.execute("SELECT id, name, identity FROM accounts WHERE id = ?", (account_id,)).fetchone()
+    return {"id": row[0], "name": row[1], "identity": row[2]} if row else None
 
 
-BASE_COLUMNS = "slug, api_key, created_at, quota_bytes, size_bytes, suspended_at"
+BASE_COLUMNS = (
+    "bases.slug, bases.api_key, bases.created_at, bases.quota_bytes, bases.size_bytes, bases.suspended_at, "
+    "bases.held_at, accounts.name, accounts.identity"
+)
+BASE_FROM = "bases JOIN accounts ON accounts.id = bases.owner_id"
 
 
 def _base(row):
-    slug, api_key, created_at, quota, size, suspended_at = row
+    slug, api_key, created_at, quota, size, suspended_at, held_at, owner_name, owner_identity = row
     return {
         "slug": slug,
         "api_key": api_key,
         "created_at": created_at,
         "quota_bytes": quota if quota is not None else config.QUOTA_BYTES,
+        "custom_quota": quota is not None,
         "size_bytes": size,
         "suspended_at": suspended_at,
+        "held_at": held_at,
+        "owner_name": owner_name,
+        "owner_identity": owner_identity,
     }
 
 
 def bases_of(account_id):
     with transaction() as conn:
         rows = conn.execute(
-            f"SELECT {BASE_COLUMNS} FROM bases WHERE owner_id = ? ORDER BY created_at",
+            f"SELECT {BASE_COLUMNS} FROM {BASE_FROM} WHERE owner_id = ? ORDER BY bases.created_at",
             (account_id,),
         ).fetchall()
     return [_base(r) for r in rows]
@@ -100,8 +117,25 @@ def bases_of(account_id):
 
 def all_bases():
     with transaction() as conn:
-        rows = conn.execute(f"SELECT {BASE_COLUMNS} FROM bases ORDER BY slug").fetchall()
+        rows = conn.execute(f"SELECT {BASE_COLUMNS} FROM {BASE_FROM} ORDER BY bases.slug").fetchall()
     return [_base(r) for r in rows]
+
+
+def base(slug):
+    with transaction() as conn:
+        row = conn.execute(f"SELECT {BASE_COLUMNS} FROM {BASE_FROM} WHERE bases.slug = ?", (slug,)).fetchone()
+    return _base(row) if row else None
+
+
+def set_held(slug, held_at):
+    """Marks a base stopped (held_at, a time) or started (None) by the host."""
+    with transaction() as conn:
+        conn.execute("UPDATE bases SET held_at = ? WHERE slug = ?", (held_at, slug))
+
+
+def count_accounts():
+    with transaction() as conn:
+        return conn.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
 
 
 def record_size(slug, size_bytes, suspended_at):

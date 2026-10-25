@@ -12,6 +12,9 @@ class FakeProvisioner:
         self.running = {}
         self.stopped = set()
         self.sizes = {}
+        self.samples = {}  # slug -> provision.sample()'s tuple
+        self.calls = []
+        self.admins = {}  # slug -> admin names, for reset_admin_token()
         self.fail_admin = False
 
     def create(self, slug, api_key):
@@ -22,6 +25,41 @@ class FakeProvisioner:
         if self.fail_admin:
             raise RuntimeError("container exited")
         return f"gcm_token_for_{name}"
+
+    def details(self):
+        return {
+            slug: {
+                "status": self.status(slug),
+                "image": config.IMAGE,
+                "started_at": "2026-10-25T10:00:00.000Z",
+                "restarts": 0,
+                "oom_killed": False,
+                "cpu_limit_percent": 50.0,
+            }
+            for slug in self.running
+        }
+
+    def sample(self, slug):
+        return self.samples.get(slug) if self.status(slug) == "running" else None
+
+    def host(self):
+        return {"cpus": 4, "memory_bytes": 8 * 1024**3}
+
+    def logs(self, slug, lines=200):
+        return f"log line from {slug}\n"
+
+    def restart(self, slug):
+        self.calls.append(("restart", slug))
+
+    def recreate(self, slug, api_key):
+        self.calls.append(("recreate", slug, api_key))
+        self.stopped.discard(slug)
+
+    def reset_admin_token(self, slug, name=""):
+        admins = self.admins.get(slug, ["Alice"])
+        if name and name not in admins:
+            raise ValueError(f"No admin named {name!r}. Its admins: {', '.join(admins)}.")
+        return {"name": name or admins[0], "token": f"gcm_tok-new-for-{name or admins[0]}"}
 
     def volume_sizes(self):
         return dict(self.sizes)
@@ -59,6 +97,15 @@ def app(tmp_path, monkeypatch, provisioner):
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture()
+def operator(app, monkeypatch):
+    """A client signed in as an operator (ADMIN_IDENTITIES)."""
+    monkeypatch.setattr(config, "ADMIN_IDENTITIES", {"dev:Root"})
+    client = app.test_client()
+    sign_in(client, "Root")
+    return client
 
 
 def csrf(client):

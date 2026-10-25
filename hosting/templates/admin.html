@@ -1,0 +1,93 @@
+{% extends "admin_layout.html" %}
+{% block content %}
+<header class="page-head">
+  <h1>Bases</h1>
+  <p class="hint">
+    CPU and memory read every {{ stats_seconds }}s, disk every {{ "%d min" % (quota_check_seconds // 60) if quota_check_seconds >= 60 else "%ds" % quota_check_seconds }}.
+    {% if refresh %}Reloading every {{ refresh }}s · <a href="{{ url_for('admin.overview', sort=sort) }}">stop</a>
+    {% else %}<a href="{{ url_for('admin.overview', sort=sort, refresh=15) }}">Reload every 15s</a>{% endif %}
+  </p>
+</header>
+
+<section class="tiles">
+  <div class="tile">
+    <span class="label">Bases</span>
+    <span class="value">{{ totals.bases }}<small> / {{ totals.max_bases }}</small></span>
+    <span class="sub">{{ totals.running }} running{% if totals.over_quota %} · {{ totals.over_quota }} over quota{% endif %}{% if totals.held %} · {{ totals.held }} stopped by you{% endif %}</span>
+  </div>
+  <div class="tile">
+    <span class="label">CPU</span>
+    <span class="value">{{ totals.cpu_percent|percent }}</span>
+    <meter min="0" max="{{ totals.cpu_capacity_percent }}" value="{{ totals.cpu_percent }}" high="{{ totals.cpu_capacity_percent * 0.8 }}"></meter>
+    <span class="sub">of {{ totals.cpus }} cores ({{ totals.cpu_capacity_percent }}%)</span>
+  </div>
+  <div class="tile">
+    <span class="label">Memory</span>
+    <span class="value">{{ totals.memory_bytes|bytes }}</span>
+    {% if totals.host_memory_bytes %}<meter min="0" max="{{ totals.host_memory_bytes }}" value="{{ totals.memory_bytes }}" high="{{ totals.host_memory_bytes * 0.8 }}"></meter>{% endif %}
+    <span class="sub">of {{ totals.host_memory_bytes|bytes }} on the host · limits add up to {{ totals.memory_limits_bytes|bytes }}</span>
+  </div>
+  <div class="tile">
+    <span class="label">Disk</span>
+    <span class="value">{{ totals.disk_bytes|bytes }}</span>
+    {% if totals.quota_bytes %}<meter min="0" max="{{ totals.quota_bytes }}" value="{{ totals.disk_bytes }}" high="{{ totals.quota_bytes * 0.8 }}"></meter>{% endif %}
+    <span class="sub">of {{ totals.quota_bytes|bytes }} in quotas</span>
+  </div>
+  <div class="tile">
+    <span class="label">Accounts</span>
+    <span class="value">{{ totals.accounts }}</span>
+    <span class="sub">{% if totals.outdated %}{{ totals.outdated }} base{{ "s" if totals.outdated != 1 }} on an old image{% else %}every base on {{ image }}{% endif %}</span>
+  </div>
+  <div class="tile{% if totals.flagged %} flagged{% endif %}">
+    <span class="label">Need a look</span>
+    <span class="value">{{ totals.flagged }}</span>
+    <span class="sub">near a limit, restarting, stopped or out of date</span>
+  </div>
+</section>
+
+{% if rows %}
+<div class="table-wrap">
+<table class="bases">
+  <thead>
+    <tr>
+      {% for key, label in (("name", "Base"), ("owner", "Owner")) %}
+      <th>{% if sort == key %}{{ label }} ▾{% else %}<a href="{{ url_for('admin.overview', sort=key, refresh=refresh) }}">{{ label }}</a>{% endif %}</th>
+      {% endfor %}
+      <th>State</th>
+      {% for key, label in (("cpu", "CPU"), ("memory", "Memory"), ("disk", "Disk")) %}
+      <th>{% if sort == key %}{{ label }} ▾{% else %}<a href="{{ url_for('admin.overview', sort=key, refresh=refresh) }}">{{ label }}</a>{% endif %}</th>
+      {% endfor %}
+      <th>Up</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for b in rows %}
+    <tr{% if b.warnings %} class="flagged"{% endif %}>
+      <td><a href="{{ url_for('admin.base_page', slug=b.slug) }}"><b>{{ b.slug }}</b></a></td>
+      <td>{{ b.owner_name }}<br><small class="muted">{{ b.owner_identity }}</small></td>
+      <td><span class="badge state-{{ b.state|replace(' ', '-') }}">{{ b.state }}</span></td>
+      <td class="num">{{ b.cpu_percent|percent }}{% if b.cpu_limit_percent %} <small class="muted">/ {{ b.cpu_limit_percent|percent }}</small>{% endif %}</td>
+      <td>
+        {% if b.memory_bytes is not none %}
+        <meter min="0" max="{{ b.memory_limit_bytes }}" value="{{ b.memory_bytes }}" high="{{ b.memory_limit_bytes * 0.8 }}"></meter>
+        <small>{{ b.memory_bytes|bytes }} / {{ b.memory_limit_bytes|bytes }}</small>
+        {% else %}<small class="muted">–</small>{% endif %}
+      </td>
+      <td>
+        {% if b.size_bytes is not none %}
+        <meter min="0" max="{{ b.quota_bytes }}" value="{{ [b.size_bytes, b.quota_bytes]|min }}" high="{{ b.quota_bytes * 0.8 }}"></meter>
+        {% endif %}
+        <small>{{ b.size_bytes|bytes }} / {{ b.quota_bytes|bytes }}</small>
+      </td>
+      <td><small>{{ b.uptime or "–" }}</small></td>
+      <td><small>{{ b.warnings|join(", ") }}</small></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p>No bases yet.</p>
+{% endif %}
+{% endblock %}

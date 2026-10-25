@@ -81,6 +81,39 @@ app's database with it. Servers from GTNH Craft Monitor 5.2 on also
 refuse oversized network scans (`MAX_SCAN_ITEMS`), which stops the
 quickest way to fill one.
 
+## Control panel
+
+`/admin`, for the accounts in `ADMIN_IDENTITIES` (anyone else gets a
+404; a "Control panel" link appears on the main page for you). It shows:
+
+- **The host:** bases (of `MAX_BASES`) and how many are running, over
+  quota or stopped by you; total CPU against the host's cores; total
+  memory against the host's and against the bases' limits combined;
+  total disk against the quotas combined; accounts; bases on an old image.
+- **Every base:** owner, state, CPU against its limit, memory against its
+  limit, disk against its quota, uptime, and what needs a look - near a
+  limit, killed for memory, restarting, stopped, or on an old image.
+  Sortable by CPU, memory, disk, name or owner.
+
+CPU and memory are read every `STATS_SECONDS` (10), disk at each quota
+check. The pages are plain HTML with no scripts. Add `?refresh=15`, or use
+the link, to reload them by themselves.
+
+A base's page has its last 200 log lines, its in-game settings, and:
+
+- **Stop / Start / Restart.** A base you stop stays stopped, even through
+  the quota check, until you start it here.
+- **Recreate:** a new container from the current `IMAGE` (pulled first)
+  on the same data - how bases get a new release.
+- **Reset an admin's token:** for an owner who lost theirs. It replaces
+  that admin's sign-in token (by default the base's oldest admin) and
+  shows the new one once. If the base has no admin left, it makes one.
+- **Disk quota:** in MB, or empty for the default. It takes effect at
+  once, stopping or starting the base.
+- **Delete:** the container and all its data, after typing its name.
+
+Every action is logged with who did it.
+
 ## Things to know before opening it to the public
 
 - **The Docker socket is root on the host.** This app needs it to start
