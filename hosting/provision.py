@@ -46,6 +46,58 @@ print(json.dumps({"name": pick["display_name"], "token": store.users.replace_cre
 """
 
 
+# Run in a one-off container of IMAGE over the shared game data
+# (hosting/indexer.py): builds each version's index (gcm/gamedata_index.py)
+# that's missing or out of date, so bases read the shared one instead of
+# each building its own. With the bases' image, so the index is the format
+# their server reads. Prints {versions: [{version, state[, error]}]} or
+# {error}.
+INDEX_SCRIPT = """
+import json, os, sys
+root = sys.argv[1]
+# Files owned like the folder they're in, not by the container's root.
+if os.getuid() == 0:
+    owner = os.stat(root)
+    os.setgid(owner.st_gid)
+    os.setuid(owner.st_uid)
+try:
+    from gcm import gamedata_index as g
+except ImportError as e:
+    print(json.dumps({"error": f"this image has no game data index ({e})"}))
+    sys.exit(0)
+out = []
+for name in sorted(os.listdir(root)):
+    bundle = os.path.join(root, name)
+    if not os.path.isfile(os.path.join(bundle, "data.json")):
+        continue
+    path = os.path.join(bundle, g.FILE)
+    try:
+        if g.is_current(path, bundle):
+            out.append({"version": name, "state": "current"})
+        else:
+            g.build(bundle, path)
+            out.append({"version": name, "state": "built"})
+    except Exception as e:
+        out.append({"version": name, "state": "failed", "error": str(e)})
+print(json.dumps({"versions": out}))
+"""
+INDEXER_MOUNT = "/gamedata"
+
+
+def indexer_spec():
+    """docker-py's containers.run() arguments for an indexing run."""
+    return {
+        "image": config.IMAGE,
+        "command": ["python", "-c", INDEX_SCRIPT, INDEXER_MOUNT],
+        "volumes": {config.GAMEDATA_SHARED_DIR: {"bind": INDEXER_MOUNT, "mode": "rw"}},
+        "labels": {"gcm-hosting.indexer": "1"},
+        "network_disabled": True,
+        # Building holds a version's whole lookup and zip directory at once.
+        "mem_limit": "1g",
+        "remove": True,
+    }
+
+
 def started_timestamp(docker_time):
     """Docker's "2026-10-25T12:46:52.128342874Z" as whole Unix seconds."""
     return int(datetime.datetime.fromisoformat(docker_time[:19]).replace(tzinfo=datetime.UTC).timestamp())
@@ -232,6 +284,16 @@ class DockerProvisioner:
         except self.errors.NotFound:
             pass
         self.client.containers.run(**container_spec(slug, api_key))
+
+    def index_shared_gamedata(self):
+        """Runs INDEX_SCRIPT over GAMEDATA_SHARED_DIR; returns what it
+        printed, parsed."""
+        output = self.client.containers.run(**indexer_spec())
+        lines = output.decode(errors="replace").strip().splitlines()
+        try:
+            return json.loads(lines[-1])
+        except (IndexError, ValueError):
+            return {"error": "the indexer printed nothing useful: " + " ".join(lines[-3:])}
 
     def volume_sizes(self):
         """{slug: bytes} for every base's data volume, as Docker measures

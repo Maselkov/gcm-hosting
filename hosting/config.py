@@ -30,6 +30,10 @@ NETWORK_SUBNET = os.environ.get("NETWORK_SUBNET", "172.30.0.0/16")
 # A host directory of game data bundles every base reads, read-only
 # (GAMEDATA_SHARED_DIR in the base). Empty: each base downloads its own.
 GAMEDATA_SHARED_DIR = os.environ.get("GAMEDATA_SHARED_DIR", "").strip()
+# How often the shared game data is checked for versions to index
+# (hosting/indexer.py); it's also done at startup and before a base is
+# made or recreated.
+GAMEDATA_INDEX_SECONDS = int(os.environ.get("GAMEDATA_INDEX_SECONDS", "900"))
 CERT_RESOLVER = os.environ.get("CERT_RESOLVER", "le")
 # A base with a GTNH 2.9 bundle live, a full scan and icons served holds
 # ~290 MB and peaks ~315 MB.

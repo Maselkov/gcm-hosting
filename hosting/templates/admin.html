@@ -45,6 +45,23 @@
   </div>
 </section>
 
+{% if gamedata is not none %}
+<section class="gamedata">
+  <h2>Shared game data</h2>
+  <p class="hint">Indexed in the shared folder with {{ image }}, so bases don't each build their own copy: at startup, every {{ "%d min" % (gamedata_index_seconds // 60) if gamedata_index_seconds >= 60 else "%ds" % gamedata_index_seconds }}, and before a base is made or recreated.
+    {% if gamedata.at %}Last checked {{ gamedata.at|when }}.{% else %}Not checked yet.{% endif %}</p>
+  {% if gamedata.result and gamedata.result.error %}<p class="error">{{ gamedata.result.error }}</p>{% endif %}
+  {% if gamedata.result and gamedata.result.versions %}
+  <ul class="versions">
+    {% for v in gamedata.result.versions %}
+    <li><b>{{ v.version }}</b> <span class="badge state-{{ 'running' if v.state != 'failed' else 'exited' }}">{{ "indexed" if v.state == "current" else ("just indexed" if v.state == "built" else "failed") }}</span>{% if v.error %} <small class="muted">{{ v.error }}</small>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% elif gamedata.result %}<p class="hint">No versions in the shared folder.</p>{% endif %}
+  <form method="post" action="{{ url_for('admin.index_gamedata') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Index now</button></form>
+</section>
+{% endif %}
+
 {% if rows %}
 <div class="table-wrap">
 <table class="bases">

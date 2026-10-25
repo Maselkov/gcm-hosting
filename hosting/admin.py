@@ -10,7 +10,7 @@ import time
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 
-from hosting import auth, config, db, provision, quota, stats
+from hosting import auth, config, db, indexer, provision, quota, stats
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 log = logging.getLogger("hosting.admin")
@@ -140,10 +140,28 @@ def overview():
         refresh=_refresh(),
         image=config.IMAGE,
         stats_seconds=config.STATS_SECONDS,
+        gamedata=indexer.last() if indexer.enabled() else None,
+        gamedata_index_seconds=config.GAMEDATA_INDEX_SECONDS,
         quota_check_seconds=config.QUOTA_CHECK_SECONDS,
         csrf=auth.csrf_token(),
         account=auth.current_account(),
     )
+
+
+@bp.route("/gamedata/index", methods=["POST"])
+@auth.operator_required
+def index_gamedata():
+    auth.check_csrf()
+    result = indexer.run(provisioner())
+    if result is None:
+        flash("There's no shared game data: GAMEDATA_SHARED_DIR isn't set.")
+    elif result.get("error"):
+        flash(f"Indexing failed: {result['error']}")
+    else:
+        built = [v["version"] for v in result["versions"] if v["state"] == "built"]
+        flash(f"Indexed {', '.join(built)}." if built else "Every version was already indexed.")
+    log.info("shared game data indexed (by %s)", auth.current_account()["identity"])
+    return redirect(url_for("admin.overview"))
 
 
 def _row(slug):
@@ -229,6 +247,9 @@ def restart(slug):
 @auth.operator_required
 def recreate(slug):
     base = _action(slug)
+    # A new image may read a new index format: built in the shared folder
+    # first, so the base doesn't build its own.
+    indexer.run(provisioner())
     provisioner().recreate(slug, base["api_key"])
     if base["suspended_at"] or base["held_at"]:
         provisioner().stop(slug)

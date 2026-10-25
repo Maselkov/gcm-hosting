@@ -34,12 +34,16 @@ holding `<version>/` folders, laid out like a server's
 `data/gamedata/` (copy them from any server that downloaded them), and
 every base reads them from there, mounted read-only, instead of each
 downloading its own. Replace a folder there when its version is rebuilt.
-Then build each version's index into it, so the bases share one copy
-instead of each building its own (a couple of seconds each):
-
-```bash
-docker run --rm -v "$GAMEDATA_SHARED_DIR":/g "$IMAGE" python app.py index-gamedata /g/<version>
-```
+Each version also needs an index there (its icon and item lookups as one
+file, read in place), or every base builds its own copy of it. This app
+builds them for you: with the bases' `IMAGE`, since an index's format
+belongs to the server version, in a short-lived container that's the
+only thing mounting the folder writable, as the folder's owner. It runs
+at startup, every `GAMEDATA_INDEX_SECONDS` (900), before a base is made
+or recreated, and from the control panel's **Index now**. A version
+already indexed is only checked, which takes well under a second, and a
+new one takes a couple of seconds. The control panel shows each version's
+state.
 This needs a GTNH Craft Monitor release with `GAMEDATA_SHARED_DIR`
 (after 5.1.0); older images ignore it and download their own.
 
@@ -136,7 +140,7 @@ Every action is logged with who did it.
 ```bash
 uv venv .venv && uv pip install -p .venv -r requirements-dev.txt
 .venv/bin/python -m pytest -q
-uvx ruff check . && uvx ruff format --check .
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
 ```
 
 `DOMAIN=localhost DEV_LOGIN=1 python app.py` runs it without Discord:

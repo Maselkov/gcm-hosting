@@ -84,3 +84,6 @@ table.bases tr:last-child td { border-bottom: 0; }
 .danger-card { border-color: var(--danger); }
 button.secondary { background: var(--card); color: var(--fg); border: 1px solid var(--border); }
 pre.logs { max-height: 28rem; overflow: auto; font-size: 0.8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gamedata { margin: 1rem 0 1.5rem; }
+.gamedata h2 { margin-bottom: 0.25rem; }
+ul.versions { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }

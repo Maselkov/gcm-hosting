@@ -6,7 +6,7 @@ import secrets
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, session, url_for
 
-from hosting import auth, config, db
+from hosting import auth, config, db, indexer
 
 bp = Blueprint("pages", __name__)
 log = logging.getLogger("hosting")
@@ -122,6 +122,9 @@ def create_base():
     if problem:
         return render_index(error=problem, status=409)
     try:
+        # A version added since the last run gets its index before the
+        # base could build its own copy.
+        indexer.run(provisioner())
         provisioner().create(slug, api_key)
         token = provisioner().create_admin(slug, account["name"])
     except Exception:

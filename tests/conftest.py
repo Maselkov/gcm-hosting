@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from hosting import config, create_app
+from hosting import config, create_app, indexer
 
 
 class FakeProvisioner:
@@ -15,6 +15,8 @@ class FakeProvisioner:
         self.samples = {}  # slug -> provision.sample()'s tuple
         self.calls = []
         self.admins = {}  # slug -> admin names, for reset_admin_token()
+        # What index_shared_gamedata() returns, or an exception it raises.
+        self.index_result = {"versions": [{"version": "2.9.0", "state": "current"}]}
         self.fail_admin = False
 
     def create(self, slug, api_key):
@@ -61,6 +63,12 @@ class FakeProvisioner:
             raise ValueError(f"No admin named {name!r}. Its admins: {', '.join(admins)}.")
         return {"name": name or admins[0], "token": f"gcm_tok-new-for-{name or admins[0]}"}
 
+    def index_shared_gamedata(self):
+        self.calls.append(("index",))
+        if isinstance(self.index_result, Exception):
+            raise self.index_result
+        return self.index_result
+
     def volume_sizes(self):
         return dict(self.sizes)
 
@@ -91,6 +99,8 @@ def app(tmp_path, monkeypatch, provisioner):
     monkeypatch.setattr(config, "SECRET_KEY", "test-secret")
     monkeypatch.setattr(config, "DEV_LOGIN", True)
     monkeypatch.setattr(config, "DOMAIN", "example.net")
+    monkeypatch.setattr(config, "GAMEDATA_SHARED_DIR", "")
+    indexer.reset()
     return create_app(provisioner)
 
 
