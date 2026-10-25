@@ -90,7 +90,20 @@ This needs GTNH Craft Monitor 6.0 or later; older images ignore
 `GAMEDATA_SHARED_DIR` and download their own. The app pulls `IMAGE` at
 startup, before the first index, so a tag that's moved (`latest`, `6.1`)
 isn't left at an older copy Docker had cached; if the pull fails, it uses
-the local copy. Existing bases still need **Recreate** to run it.
+the local copy.
+
+### New releases
+
+`IMAGE` defaults to `ghcr.io/maselkov/gtnh-craft-monitor:latest`, the
+newest GTNH Craft Monitor release, and bases follow it by themselves
+(`hosting/upgrade.py`): at startup and every `UPGRADE_CHECK_SECONDS`
+(an hour) the app pulls `IMAGE`, and any base whose container runs an
+older image than the tag now names is recreated on it, keeping its data.
+The shared game data is indexed with the new image first, and a base you
+stopped stays stopped. Players see their base restart, a few seconds.
+Images are compared by ID, so this works for any tag that moves: pin
+`IMAGE` to `6.1` to get only 6.1.x, or set `UPGRADE_CHECK_SECONDS=0` to
+upgrade only with **Recreate**.
 
 ### Limits
 
@@ -158,7 +171,8 @@ A base's page has its last 200 log lines, its in-game settings, and:
 - **Stop / Start / Restart.** A base you stop stays stopped, even through
   the quota check, until you start it here.
 - **Recreate:** a new container from the current `IMAGE` (pulled first)
-  on the same data - how bases get a new release.
+  on the same data - a new release at once, without waiting for the
+  upgrade check.
 - **Reset an admin's token:** for an owner who lost theirs. It replaces
   that admin's sign-in token (by default the base's oldest admin) and
   shows the new one once. If the base has no admin left, it makes one.

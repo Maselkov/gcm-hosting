@@ -470,8 +470,8 @@ class DockerProvisioner:
         return answer
 
     def details(self):
-        """{slug: {status, image, started_at, restarts, oom_killed,
-        cpu_limit_percent}} for every base's container."""
+        """{slug: {status, image, image_id, version, started_at, restarts,
+        oom_killed, cpu_limit_percent}} for every base's container."""
         out = {}
         for container in self.client.containers.list(all=True, filters={"label": LABEL}):
             if not ours(container.labels):
@@ -480,6 +480,11 @@ class DockerProvisioner:
             out[container.labels[LABEL]] = {
                 "status": container.status,
                 "image": (container.attrs.get("Config") or {}).get("Image"),
+                "image_id": container.attrs.get("Image"),
+                # The release, as the image's build labelled it.
+                "version": ((container.attrs.get("Config") or {}).get("Labels") or {}).get(
+                    "org.opencontainers.image.version"
+                ),
                 "started_at": state.get("StartedAt") if container.status == "running" else None,
                 "restarts": container.attrs.get("RestartCount", 0),
                 "oom_killed": bool(state.get("OOMKilled")),
@@ -546,6 +551,13 @@ class DockerProvisioner:
         except self.errors.APIError:
             return False
         return True
+
+    def image_id(self):
+        """The ID of the image IMAGE names here, or None if there isn't one."""
+        try:
+            return self.client.images.get(config.IMAGE).id
+        except self.errors.ImageNotFound:
+            return None
 
     def index_shared_gamedata(self):
         """Runs INDEX_SCRIPT over GAMEDATA_SHARED_DIR; returns what it

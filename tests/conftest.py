@@ -26,6 +26,8 @@ class FakeProvisioner:
         self.fail_rename = False
         self.reports = {}  # slug -> last_report()'s answer, or an exception
         self.fail_private = False
+        self.current_image = "sha256:new"  # what image_id() returns
+        self.images = {}  # slug -> its container's image ID, if not the current one
 
     def create(self, slug, api_key):
         assert slug not in self.running
@@ -60,6 +62,8 @@ class FakeProvisioner:
             slug: {
                 "status": self.status(slug),
                 "image": config.IMAGE,
+                "image_id": self.images.get(slug, self.current_image),
+                "version": "6.1.0",
                 "started_at": "2026-10-25T10:00:00.000Z",
                 "restarts": 0,
                 "oom_killed": False,
@@ -83,6 +87,7 @@ class FakeProvisioner:
     def recreate(self, slug, api_key):
         self.calls.append(("recreate", slug, api_key))
         self.stopped.discard(slug)
+        self.images.pop(slug, None)
 
     def reset_admin_token(self, slug, name=""):
         admins = self.admins.get(slug, ["Alice"])
@@ -93,6 +98,9 @@ class FakeProvisioner:
     def pull_image(self):
         self.calls.append(("pull",))
         return self.pull_works
+
+    def image_id(self):
+        return self.current_image
 
     def index_shared_gamedata(self):
         self.calls.append(("index",))

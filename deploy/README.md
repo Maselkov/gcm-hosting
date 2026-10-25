@@ -134,6 +134,8 @@ Count testing's bases as part of what the host has to fit. The
 `GAMEDATA_SHARED_DIR` can be the same folder for both as long as both
 `.env`s have the same `IMAGE`. Each instance builds the folder's index
 with its own `IMAGE`, and the index format follows the server version.
+With `:latest` the two can be a release apart for up to an
+`UPGRADE_CHECK_SECONDS`, after one's out.
 Only one needs to download into it: give testing `GAMEDATA_DOWNLOAD=0`.
 To try a new bases' `IMAGE` on testing, give testing its own copy of the
 folder first.

@@ -38,7 +38,7 @@
   <div class="tile{% if base.warnings %} flagged{% endif %}">
     <span class="label">Container</span>
     <span class="value">{{ base.uptime or base.status }}</span>
-    <span class="sub">{{ base.image or "no container" }}{% if base.restarts %} · restarted {{ base.restarts }}x{% endif %}{% if base.oom_killed %} · killed for memory{% endif %}</span>
+    <span class="sub">{{ base.image or "no container" }}{% if base.version %} ({{ base.version }}){% endif %}{% if base.restarts %} · restarted {{ base.restarts }}x{% endif %}{% if base.oom_killed %} · killed for memory{% endif %}</span>
   </div>
 </section>
 {% if base.warnings %}<p class="notice">Needs a look: {{ base.warnings|join(", ") }}.</p>{% endif %}

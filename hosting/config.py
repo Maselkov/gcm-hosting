@@ -30,7 +30,11 @@ STATS_SECONDS = int(os.environ.get("STATS_SECONDS", "10"))
 # so two instances on one Docker host (deploy/README.md) don't see or
 # touch each other's bases.
 INSTANCE = os.environ.get("INSTANCE", "gcm").strip()
-IMAGE = os.environ.get("IMAGE", "ghcr.io/maselkov/gtnh-craft-monitor:6.0")
+# :latest is the newest release; bases follow it (hosting/upgrade.py).
+IMAGE = os.environ.get("IMAGE", "ghcr.io/maselkov/gtnh-craft-monitor:latest")
+# How often IMAGE is pulled and bases on an older one recreated on it
+# (hosting/upgrade.py); also at startup. 0: only by hand (Recreate).
+UPGRADE_CHECK_SECONDS = int(os.environ.get("UPGRADE_CHECK_SECONDS", "3600"))
 NETWORK = os.environ.get("NETWORK", "gcm-bases")
 # The network's subnet: the proxy's address is in it, so bases trust its
 # X-Forwarded-* headers.

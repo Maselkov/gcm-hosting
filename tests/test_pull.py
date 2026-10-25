@@ -1,7 +1,7 @@
 from unittest import mock
 
 import app as entrypoint
-from hosting import config, indexer, provision
+from hosting import config, indexer, provision, upgrade
 
 
 class APIError(Exception):
@@ -35,6 +35,7 @@ def test_a_local_only_image_or_a_registry_thats_down_is_used_as_it_is(monkeypatc
 def test_startup_pulls_before_the_indexer_starts(provisioner, monkeypatch):
     started = []
     monkeypatch.setattr(indexer, "start", lambda p: started.append(list(p.calls)))
+    monkeypatch.setattr(upgrade, "start", lambda p: None)
     entrypoint.warm_up(provisioner)
     assert started == [[("pull",)]]
 
