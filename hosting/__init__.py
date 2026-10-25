@@ -9,7 +9,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from hosting import admin, config, db, pages
 
 CSP = (
-    "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
+    "form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
 )
 
 

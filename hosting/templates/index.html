@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GTNH Craft Monitor hosting</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='copy.js') }}" defer></script>
 </head>
 <body>
 <main>
@@ -17,14 +18,23 @@
 
   {% if created %}
   <section class="created">
-    <h2>{{ created.slug }} is ready</h2>
+    <h2><span class="tick" aria-hidden="true">✓</span> {{ created.slug }} is ready</h2>
     <p>Your admin sign-in token. <strong>It's shown only this once</strong>: copy it now.</p>
-    <pre>{{ created.token }}</pre>
-    <ol>
-      <li>Open <a href="{{ created.url }}">{{ created.url }}</a> and sign in with the token.</li>
+    {% with value = created.token %}{% include "_token.html" %}{% endwith %}
+    <ol class="steps">
+      <li><a class="button big" href="{{ created.url }}">Open {{ created.slug }} →</a> and sign in with the token.</li>
       <li>Pick your GTNH version: <b>Settings (⚙) → Game data</b>.</li>
       <li>Connect a computer in game: <b>Settings (⚙) → Status → Connect a computer</b> gives the command to paste.</li>
     </ol>
+  </section>
+  {% endif %}
+
+  {% if token %}
+  <section class="created">
+    <h2><span class="tick" aria-hidden="true">✓</span> New sign-in token for {{ token.name }}</h2>
+    <p>On {{ token.slug }}. {% if token.created %}It had no admins, so {{ token.name }} was made one. {% endif %}The old token and sign-ins no longer work. <strong>It's shown only this once</strong>: copy it now.</p>
+    {% with value = token.token %}{% include "_token.html" %}{% endwith %}
+    <p><a class="button big" href="{{ token.url }}">Open {{ token.slug }} →</a></p>
   </section>
   {% endif %}
 
@@ -57,6 +67,17 @@
       <pre>SERVER_URL = "{{ base.url }}"
 API_KEY    = "{{ base.api_key }}"</pre>
     </details>
+    {% if base.status == "running" %}
+    <details>
+      <summary>Lost your sign-in token?</summary>
+      <p>Makes a new token for an admin of this base. Their old token and sign-ins stop working.</p>
+      <form method="post" action="{{ url_for('pages.reset_token', slug=base.slug) }}" class="create">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Admin's name <input name="name" placeholder="the first admin" autocomplete="off"></label>
+        <button>Get a new token</button>
+      </form>
+    </details>
+    {% endif %}
     <details>
       <summary>Delete this base</summary>
       <p>Deletes everything in it: history, users, settings. This can't be undone.</p>

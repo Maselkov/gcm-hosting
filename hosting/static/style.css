@@ -8,6 +8,7 @@
   --danger: #c53b3b;
   --error-bg: #fdecec;
   --ok-bg: #eaf6ee;
+  --ok: #2b8a4b;
   --warn: #c98a12;
   --warn-bg: #fdf3dd;
 }
@@ -22,11 +23,13 @@
     --danger: #ef7676;
     --error-bg: #3a1f22;
     --ok-bg: #1d3326;
+    --ok: #5cc27f;
     --warn: #e0a83a;
     --warn-bg: #3a2f17;
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
 main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem; }
 h1 { margin: 0 0 0.25rem; }
@@ -34,7 +37,17 @@ h1 { margin: 0 0 0.25rem; }
 a { color: var(--accent); }
 pre { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; overflow-x: auto; }
 .error { background: var(--error-bg); padding: 0.75rem; border-radius: 6px; }
-.created { background: var(--ok-bg); padding: 0.25rem 1rem 0.5rem; border-radius: 8px; }
+.created { background: var(--ok-bg); border: 1px solid var(--ok); border-radius: 10px; padding: 0.5rem 1.25rem 1rem; margin-bottom: 1.5rem; }
+.created h2 { display: flex; align-items: center; gap: 0.6rem; }
+.tick { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--ok); color: var(--bg); font-size: 1rem; flex-shrink: 0; }
+.token-row { display: flex; gap: 0.75rem; align-items: stretch; margin: 1rem 0; }
+.token { flex: 1; min-width: 0; display: block; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 0.9rem; font: 1rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-all; user-select: all; }
+button.copy { flex-shrink: 0; padding: 0.7rem 1.4rem; font-weight: 600; font-size: 1.05rem; min-width: 9rem; }
+button.copy.copied { background: var(--ok); color: var(--bg); }
+@media (max-width: 32rem) { .token-row { flex-direction: column; } button.copy { width: 100%; } }
+ol.steps { padding-left: 1.25rem; }
+ol.steps li { margin: 0.6rem 0; }
+.button.big { padding: 0.55rem 1.1rem; font-weight: 600; }
 .base { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 1rem; margin-bottom: 1rem; }
 .base h3 { margin: 0.5rem 0; }
 .status { font-size: 0.8rem; font-weight: normal; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 0.5rem; }

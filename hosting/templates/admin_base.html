@@ -12,7 +12,7 @@
 <section class="created">
   <h2>New sign-in token for {{ token.name }}</h2>
   <p>{% if token.created %}The base had no admin by that name, so {{ token.name }} was made one. {% endif %}Their old tokens and sessions no longer work. <strong>It's shown only this once.</strong></p>
-  <pre>{{ token.token }}</pre>
+  {% with value = token.token %}{% include "_token.html" %}{% endwith %}
 </section>
 {% endif %}
 

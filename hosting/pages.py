@@ -1,4 +1,4 @@
-"""The pages: sign in, your bases, make one, delete one."""
+"""The pages: sign in, your bases, make one, delete one, get a new token."""
 
 import logging
 import secrets
@@ -31,7 +31,7 @@ def bytes_filter(n):
     return human_bytes(n) if n is not None else "not measured yet"
 
 
-def render_index(error=None, created=None, status=200):
+def render_index(error=None, created=None, token=None, status=200):
     account = auth.current_account()
     bases = []
     if account:
@@ -52,6 +52,7 @@ def render_index(error=None, created=None, status=200):
             bases=bases,
             error=error,
             created=created,
+            token=token,
             csrf=auth.csrf_token(),
             domain=config.DOMAIN,
             dev_login=config.DEV_LOGIN,
@@ -151,6 +152,30 @@ def create_base():
     log.info("Base %s made for %s (%s)", slug, account["id"], "private" if private else "public")
     # Shown on this response only; this app doesn't keep it.
     return render_index(created={"slug": slug, "url": config.base_url(slug), "token": token}, status=201)
+
+
+@bp.route("/bases/<slug>/reset-token", methods=["POST"])
+@auth.login_required
+def reset_token(slug):
+    """For an owner who lost their base's token: replaces an admin's
+    (empty name: the base's first, made with it)."""
+    auth.check_csrf()
+    account = auth.current_account()
+    if db.owner_of(slug) != account["id"]:
+        abort(404)
+    if provisioner().status(slug) != "running":
+        return render_index(error=f"{slug} isn't running, so its token can't be reset.", status=409)
+    name = request.form.get("name", "").strip()[:60]
+    try:
+        token = provisioner().reset_admin_token(slug, name)
+    except ValueError as e:
+        return render_index(error=str(e), status=400)
+    except Exception:
+        log.exception("Resetting %s's admin token failed", slug)
+        return render_index(error="Making a new token didn't work. Try again later.", status=500)
+    log.info("%s: admin token reset for %s (by its owner %s)", slug, token["name"], account["identity"])
+    # Shown on this response only; this app doesn't keep it.
+    return render_index(token={**token, "slug": slug, "url": config.base_url(slug)})
 
 
 @bp.route("/bases/<slug>/delete", methods=["POST"])

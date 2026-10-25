@@ -101,6 +101,44 @@ def test_only_the_owner_can_delete(client, app, provisioner):
     assert "mine" in provisioner.running
 
 
+def test_an_owner_can_get_a_new_token_shown_once(client, provisioner):
+    sign_in(client, "Alice")
+    make_base(client, "mine")
+    url = "/bases/mine/reset-token"
+    assert "Lost your sign-in token?" in client.get("/").get_data(as_text=True)
+
+    page = client.post(url, data={"csrf": csrf(client)}).get_data(as_text=True)
+    assert "gcm_tok-new-for-Alice" in page and 'data-copy="token"' in page
+    assert "gcm_tok-new-for-Alice" not in client.get("/").get_data(as_text=True)
+
+    provisioner.admins["mine"] = ["Alice", "Carol"]
+    page = client.post(url, data={"name": "Carol", "csrf": csrf(client)}).get_data(as_text=True)
+    assert "gcm_tok-new-for-Carol" in page
+    response = client.post(url, data={"name": "Nobody", "csrf": csrf(client)})
+    assert response.status_code == 400 and "Its admins: Alice, Carol" in response.get_data(as_text=True)
+    assert client.post(url, data={}).status_code == 400
+
+
+def test_only_the_owner_can_reset_a_running_base_token(client, app, provisioner):
+    sign_in(client, "Alice")
+    make_base(client, "mine")
+    other = app.test_client()
+    sign_in(other, "Bob")
+    assert other.post("/bases/mine/reset-token", data={"csrf": csrf(other)}).status_code == 404
+
+    provisioner.stop("mine")
+    response = client.post("/bases/mine/reset-token", data={"csrf": csrf(client)})
+    assert response.status_code == 409 and "gcm_tok-new" not in response.get_data(as_text=True)
+
+
+def test_the_new_token_has_a_copy_button_scripts_may_run(client):
+    sign_in(client, "Alice")
+    response = make_base(client, "mine")
+    page = response.get_data(as_text=True)
+    assert 'data-copy="token"' in page and "copy.js" in page
+    assert "script-src 'self'" in response.headers["Content-Security-Policy"]
+
+
 def test_forms_need_the_csrf_token(client, provisioner):
     sign_in(client, "Alice")
     assert client.post("/bases", data={}).status_code == 400
