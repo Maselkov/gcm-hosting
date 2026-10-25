@@ -33,6 +33,7 @@ def test_a_base_container_is_routed_limited_and_isolated(monkeypatch):
         "/srv/gamedata": {"bind": "/gamedata-shared", "mode": "ro"},
     }
     assert env["HISTORY_HOURLY_AFTER_DAYS"] == "7" and env["HISTORY_DAILY_AFTER_DAYS"] == "30"
+    assert env["WEBHOOK_HOSTS"].split(",")[0] == "discord.com"
     assert spec["cap_drop"] == ["ALL"] and spec["mem_limit"] and spec["pids_limit"]
 
 

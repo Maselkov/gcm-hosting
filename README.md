@@ -228,6 +228,10 @@ Every action is logged with who did it.
   your distribution does, and check a base still loads afterwards.
 
   Bases still reach the internet, for push notifications and webhooks.
+  A base's admins set its webhooks on its page, but they can only post
+  to the hosts in `WEBHOOK_HOSTS` (Discord and Slack by default; empty:
+  any), so a base can't make your host post anywhere else. A base gets
+  a changed list on **Recreate** in the control panel.
 - You hold players' data: say how long you keep it and how to delete it
   (deleting a base on the page removes its container and volume).
 
