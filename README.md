@@ -51,10 +51,10 @@ of ~11k items, icons being served) holds about 290 MB, peaking around
 315 MB, and almost none of it is shared with other bases. So a 4 GB host
 fits about 10 (`MAX_BASES`). `MAX_BASES_PER_ACCOUNT` defaults to 1.
 
-From the GTNH Craft Monitor release with the game data index (PR #119)
-on, the same base holds about 77 MB, peaking around 126 MB (with the
-index pre-built in the shared folder): set `MEMORY_LIMIT=192m` and
-roughly 40 fit in 4 GB.
+From the GTNH Craft Monitor release with the game data index (#119,
+#120) on, the same base holds about 54 MB, peaking around 80 MB (with the
+index pre-built in the shared folder): set `MEMORY_LIMIT=160m` and
+roughly 55 fit in 4 GB.
 
 **Disk.** Docker can't cap a volume's size, so this app measures every
 base's data volume every `QUOTA_CHECK_SECONDS` (300) and stops one over
