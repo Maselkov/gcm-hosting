@@ -526,17 +526,25 @@ class DockerProvisioner:
     def recreate(self, slug, api_key):
         """A new container for slug from the current IMAGE (pulled first)
         and settings, on the same volumes: an upgrade."""
-        repository, _, tag = config.IMAGE.rpartition(":")
-        if repository and "/" not in tag:
-            try:
-                self.client.images.pull(repository, tag=tag)
-            except self.errors.APIError:
-                pass  # a local-only image: use it as it is
+        self.pull_image()
         try:
             self.client.containers.get(container_name(slug)).remove(force=True)
         except self.errors.NotFound:
             pass
         self.client.containers.run(**container_spec(slug, api_key))
+
+    def pull_image(self):
+        """Pulls IMAGE, so a tag that's moved (latest, 6.1) isn't left at
+        whatever Docker had cached. Returns whether it did: an image
+        that's only local, or a registry that's down, is used as it is."""
+        repository, _, tag = config.IMAGE.rpartition(":")
+        if not repository or "/" in tag:
+            return False
+        try:
+            self.client.images.pull(repository, tag=tag)
+        except self.errors.APIError:
+            return False
+        return True
 
     def index_shared_gamedata(self):
         """Runs INDEX_SCRIPT over GAMEDATA_SHARED_DIR; returns what it

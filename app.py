@@ -8,10 +8,23 @@ starts again at once if it now fits:
 import logging
 import os
 import sys
+import threading
 
 from waitress import serve
 
-from hosting import activity, create_app, db, indexer, quota, stats
+from hosting import activity, config, create_app, db, indexer, quota, stats
+
+log = logging.getLogger("hosting")
+
+
+def warm_up(provisioner):
+    """Pulls IMAGE, then starts the indexer with it."""
+    if provisioner.pull_image():
+        log.info("Pulled %s", config.IMAGE)
+    else:
+        log.warning("Couldn't pull %s: using the local copy, if there is one", config.IMAGE)
+    indexer.start(provisioner)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -22,7 +35,9 @@ if __name__ == "__main__":
             raise SystemExit(f"No base named {sys.argv[2]!r}")
         quota.check(provisioner)
         sys.exit(0)
-    indexer.start(provisioner)
+    # The image first, so the indexer and new bases don't run a stale
+    # cached one; in the background, as a new image takes a while.
+    threading.Thread(target=warm_up, args=(provisioner,), name="pull", daemon=True).start()
     quota.start(provisioner)
     activity.start(provisioner)
     stats.start(provisioner)

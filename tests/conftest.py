@@ -20,6 +20,7 @@ class FakeProvisioner:
         self.index_result = {"versions": [{"version": "2.9.0", "state": "current"}]}
         # What download_shared_gamedata() returns, or an exception it raises.
         self.download_result = {"versions": [{"version": "2.9.0", "state": "current"}]}
+        self.pull_works = True
         self.fail_admin = False
         self.private = set()
         self.fail_rename = False
@@ -88,6 +89,10 @@ class FakeProvisioner:
         if name and name not in admins:
             raise ValueError(f"No admin named {name!r}. Its admins: {', '.join(admins)}.")
         return {"name": name or admins[0], "token": f"gcm_tok-new-for-{name or admins[0]}"}
+
+    def pull_image(self):
+        self.calls.append(("pull",))
+        return self.pull_works
 
     def index_shared_gamedata(self):
         self.calls.append(("index",))

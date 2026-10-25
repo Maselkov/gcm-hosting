@@ -87,7 +87,10 @@ already indexed is only checked, which takes well under a second, and a
 new one takes a couple of seconds. The control panel shows each version's
 state.
 This needs GTNH Craft Monitor 6.0 or later; older images ignore
-`GAMEDATA_SHARED_DIR` and download their own.
+`GAMEDATA_SHARED_DIR` and download their own. The app pulls `IMAGE` at
+startup, before the first index, so a tag that's moved (`latest`, `6.1`)
+isn't left at an older copy Docker had cached; if the pull fails, it uses
+the local copy. Existing bases still need **Recreate** to run it.
 
 ### Limits
 
