@@ -34,6 +34,12 @@ holding `<version>/` folders, laid out like a server's
 `data/gamedata/` (copy them from any server that downloaded them), and
 every base reads them from there, mounted read-only, instead of each
 downloading its own. Replace a folder there when its version is rebuilt.
+Then build each version's index into it, so the bases share one copy
+instead of each building its own (a couple of seconds each):
+
+```bash
+docker run --rm -v "$GAMEDATA_SHARED_DIR":/g "$IMAGE" python app.py index-gamedata /g/<version>
+```
 This needs a GTNH Craft Monitor release with `GAMEDATA_SHARED_DIR`
 (after 5.1.0); older images ignore it and download their own.
 
@@ -44,6 +50,11 @@ and 128 processes. A base in use (GTNH 2.9 game data live, a full scan
 of ~11k items, icons being served) holds about 290 MB, peaking around
 315 MB, and almost none of it is shared with other bases. So a 4 GB host
 fits about 10 (`MAX_BASES`). `MAX_BASES_PER_ACCOUNT` defaults to 1.
+
+From the GTNH Craft Monitor release with the game data index (PR #119)
+on, the same base holds about 77 MB, peaking around 126 MB (with the
+index pre-built in the shared folder): set `MEMORY_LIMIT=192m` and
+roughly 40 fit in 4 GB.
 
 **Disk.** Docker can't cap a volume's size, so this app measures every
 base's data volume every `QUOTA_CHECK_SECONDS` (300) and stops one over
