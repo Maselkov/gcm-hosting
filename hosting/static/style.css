@@ -89,3 +89,20 @@ pre.logs { max-height: 28rem; overflow: auto; font-size: 0.8rem; white-space: pr
 .gamedata { margin: 1rem 0 1.5rem; }
 .gamedata h2 { margin-bottom: 0.25rem; }
 ul.versions { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+
+/* Landing page */
+button:hover, .button:hover { filter: brightness(1.1); }
+.landing h1 { font-size: 2.2rem; line-height: 1.2; margin-top: 1rem; }
+.landing .lede { font-size: 1.15rem; }
+.landing ul { padding-left: 1.25rem; }
+.landing li { margin: 0.35rem 0; }
+.shot { margin: 1.5rem 0; }
+.shot img { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 30px rgb(0 0 0 / 0.18); }
+@media (min-width: 54rem) { .shot { margin-inline: -5rem; } }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: center; }
+.button.discord { background: #5865f2; display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.6rem 1.2rem; font-weight: 600; }
+.button.discord svg { width: 1.3rem; height: 1.3rem; }
+footer.site { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.9rem; }
+footer.site a { color: var(--muted); }
+footer.site a:hover { color: var(--accent); }
+footer.site svg { width: 1em; height: 1em; vertical-align: -0.125em; margin-right: 0.35em; }

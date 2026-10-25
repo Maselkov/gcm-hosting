@@ -230,6 +230,11 @@ sign in with any name. It refuses to start with `DEV_LOGIN` unless
 `*.example`, `*.invalid`), so it can't end up on a public site. With a local Traefik on the `gcm-bases` network,
 bases answer at `http://<name>.localhost`.
 
+The sign-in page shows `hosting/static/crafts.webp`, a screenshot of a
+base's Crafts tab (the tab bar and the first two rows of CPUs, in dark
+mode). Replace it by hand when that tab's look changes; keep the `width`
+and `height` in `index.html` in step with it.
+
 ## License
 
 GPL-3.0, like GTNH Craft Monitor itself: see [LICENSE](LICENSE).
