@@ -3,7 +3,7 @@ each one a separate server of the same image, without self-hosting."""
 
 import datetime
 
-from flask import Flask
+from flask import Flask, render_template, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from hosting import admin, config, db, pages
@@ -42,6 +42,18 @@ def create_app(provisioner=None):
     db.init()
     app.register_blueprint(pages.bp)
     app.register_blueprint(admin.bp)
+
+    @app.before_request
+    def no_such_base():
+        # Traefik sends <slug>.DOMAIN here when there's no base at it
+        # (docker-compose.yml). Only this page and what it needs answer
+        # there, not sign-in or the forms. It doesn't say whether the base
+        # is stopped or gone: that would tell anyone which names are real.
+        host = request.host.split(":")[0].lower()
+        if not host.endswith("." + config.DOMAIN) or request.endpoint in ("static", "pages.favicon"):
+            return None
+        scheme = "http" if config.DOMAIN == "localhost" else "https"
+        return render_template("missing.html", host=host, home=f"{scheme}://{config.DOMAIN}"), 404
 
     @app.after_request
     def headers(response):

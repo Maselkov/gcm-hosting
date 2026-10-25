@@ -254,3 +254,23 @@ def test_the_favicon_is_served_at_the_root(client):
 
     assert response.status_code == 200
     assert response.data[:4] == b"\x00\x00\x01\x00"
+
+
+def test_an_address_with_no_base_gets_a_page_saying_so(client):
+    response = client.get("/", headers={"Host": "copper-falcon-4812.example.test"})
+
+    assert response.status_code == 404
+    page = response.get_data(as_text=True)
+    assert "No base here" in page and "copper-falcon-4812.example.test" in page
+    assert 'href="https://example.test"' in page
+    assert client.get("/static/style.css", headers={"Host": "copper-falcon-4812.example.test"}).status_code == 200
+
+
+def test_the_forms_and_sign_in_only_answer_at_domain(client):
+    host = {"Host": "copper-falcon-4812.example.test"}
+
+    assert client.get("/login/discord", headers=host).status_code == 404
+    login = client.post("/login/dev", data={"name": "Alice"}, headers=host)
+    assert login.status_code == 404 and "Set-Cookie" not in login.headers
+    # Not a base's address: the health check's, say.
+    assert client.get("/", headers={"Host": "localhost:8000"}).status_code == 200
