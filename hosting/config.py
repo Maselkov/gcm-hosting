@@ -26,7 +26,9 @@ NETWORK_SUBNET = os.environ.get("NETWORK_SUBNET", "172.30.0.0/16")
 # (GAMEDATA_SHARED_DIR in the base). Empty: each base downloads its own.
 GAMEDATA_SHARED_DIR = os.environ.get("GAMEDATA_SHARED_DIR", "").strip()
 CERT_RESOLVER = os.environ.get("CERT_RESOLVER", "le")
-MEMORY_LIMIT = os.environ.get("MEMORY_LIMIT", "256m")
+# A base with a GTNH 2.9 bundle live, a full scan and icons served holds
+# ~290 MB and peaks ~315 MB.
+MEMORY_LIMIT = os.environ.get("MEMORY_LIMIT", "512m")
 CPU_LIMIT = float(os.environ.get("CPU_LIMIT", "0.5"))
 PIDS_LIMIT = int(os.environ.get("PIDS_LIMIT", "128"))
 
@@ -44,7 +46,7 @@ HISTORY_HOURLY_AFTER_DAYS = os.environ.get("HISTORY_HOURLY_AFTER_DAYS", "7")
 HISTORY_DAILY_AFTER_DAYS = os.environ.get("HISTORY_DAILY_AFTER_DAYS", "30")
 
 MAX_BASES_PER_ACCOUNT = int(os.environ.get("MAX_BASES_PER_ACCOUNT", "1"))
-MAX_BASES = int(os.environ.get("MAX_BASES", "30"))
+MAX_BASES = int(os.environ.get("MAX_BASES", "10"))
 
 
 def base_url(slug):
