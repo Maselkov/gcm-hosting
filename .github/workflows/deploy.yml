@@ -46,6 +46,9 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
+          for name in SSH_KEY KNOWN_HOSTS DEPLOY_HOST DEPLOY_USER; do
+            [[ -n ${!name} ]] || { echo "::error::$name is empty: is it set in the $ENVIRONMENT environment?"; exit 1; }
+          done
           # The tags publish.yml gives this ref's image.
           if [[ $GITHUB_REF_TYPE == tag ]]; then tag=${GITHUB_REF_NAME#v}; else tag=sha-${GITHUB_SHA::7}; fi
           dir=$(mktemp -d)

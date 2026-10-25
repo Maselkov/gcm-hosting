@@ -76,3 +76,6 @@ jobs:
     uses: ./.github/workflows/deploy.yml
     with:
       environment: ${{ github.ref_type == 'tag' && 'production' || 'testing' }}
+    # Without it a called workflow's environment secrets come out empty,
+    # its environment notwithstanding.
+    secrets: inherit
