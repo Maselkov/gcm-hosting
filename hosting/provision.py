@@ -128,6 +128,135 @@ def indexer_spec():
     }
 
 
+# Run in a one-off container of IMAGE over the shared game data
+# (hosting/indexer.py): downloads every version GAMEDATA_REPO publishes
+# that's missing, or that was downloaded from an upload since replaced
+# (the base's gcm/gamedata.py does the same for its own folder). A
+# version folder without release.json was put there by hand and is left
+# alone. Each goes into .incoming/ first and is swapped in whole, so
+# neither the indexer nor a base sees half of one. Prints
+# {versions: [{version, state[, error]}]} or {error}.
+DOWNLOAD_SCRIPT = """
+import hashlib, json, os, re, shutil, sys, urllib.request
+root, api, repo, instance = sys.argv[1:5]
+if os.getuid() == 0:
+    owner = os.stat(root)
+    os.setgid(owner.st_gid)
+    os.setuid(owner.st_uid)
+PREFIX = "gtnh-data-"
+BASE = ("data.json", "icons_lookup.json", "item_catalog.txt")
+OPTIONAL = ("ore_dict.json", "item_info.json")
+TEXTURES = ("images.zip", "images-faithful32.zip")
+VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+RECORD = "release.json"
+
+def get(url, accept="application/octet-stream"):
+    headers = {"Accept": accept, "User-Agent": "gcm-hosting"}
+    return urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60)
+
+def download(url, path):
+    digest = hashlib.sha256()
+    with get(url) as response, open(path, "wb") as f:
+        while chunk := response.read(1 << 20):
+            f.write(chunk)
+            digest.update(chunk)
+    return digest.hexdigest()
+
+try:
+    with get(f"{api}/repos/{repo}/releases?per_page=100", "application/vnd.github+json") as r:
+        releases = json.load(r)
+except Exception as e:
+    print(json.dumps({"error": f"couldn't list {repo}'s releases: {e}"}))
+    sys.exit(0)
+incoming = os.path.join(root, ".incoming")
+out = []
+for release in releases:
+    tag = release.get("tag_name", "")
+    version = tag[len(PREFIX):]
+    if not tag.startswith(PREFIX) or not VERSION.match(version) or release.get("draft"):
+        continue
+    assets = {a["name"]: a for a in release.get("assets", [])}
+    if not all(n in assets for n in BASE) or not any(n in assets for n in TEXTURES):
+        continue
+    names = [n for n in BASE + OPTIONAL + TEXTURES if n in assets]
+    target = os.path.join(root, version)
+    try:
+        with open(os.path.join(target, RECORD), encoding="utf-8") as f:
+            installed = json.load(f).get("data_asset_id")
+    except (OSError, ValueError, AttributeError):
+        installed = None
+    if installed is None and os.path.exists(target):
+        out.append({"version": version, "state": "manual"})
+        continue
+    if installed == assets["data.json"]["id"] and all(
+        os.path.isfile(os.path.join(target, n)) for n in names
+    ):
+        out.append({"version": version, "state": "current"})
+        continue
+    part = os.path.join(incoming, f"{instance}-{version}")
+    old = part + ".old"
+    try:
+        for path in (part, old):
+            shutil.rmtree(path, ignore_errors=True)
+        os.makedirs(part)
+        download(assets["data.json"]["browser_download_url"], os.path.join(part, "data.json"))
+        with open(os.path.join(part, "data.json"), encoding="utf-8") as f:
+            expected = json.load(f)["files"]
+        for name in names[1:]:
+            if name not in expected:
+                continue
+            digest = download(assets[name]["browser_download_url"], os.path.join(part, name))
+            if digest != expected[name]["sha256"]:
+                raise ValueError(f"{name} doesn't match its checksum in data.json")
+        with open(os.path.join(part, RECORD), "w", encoding="utf-8") as f:
+            json.dump({"data_asset_id": assets["data.json"]["id"]}, f)
+        if os.path.exists(target):
+            os.rename(target, old)
+        try:
+            os.rename(part, target)
+        except OSError:
+            if os.path.exists(old):
+                os.rename(old, target)
+            raise
+        shutil.rmtree(old, ignore_errors=True)
+        out.append({"version": version, "state": "downloaded"})
+    except Exception as e:
+        shutil.rmtree(part, ignore_errors=True)
+        out.append({"version": version, "state": "failed", "error": str(e)})
+print(json.dumps({"versions": out}))
+"""
+
+
+def downloader_spec():
+    """docker-py's containers.run() arguments for a download run."""
+    return {
+        "image": config.IMAGE,
+        "command": [
+            "python",
+            "-c",
+            DOWNLOAD_SCRIPT,
+            INDEXER_MOUNT,
+            config.GAMEDATA_API_URL,
+            config.GAMEDATA_REPO,
+            config.INSTANCE,
+        ],
+        "volumes": {config.GAMEDATA_SHARED_DIR: {"bind": INDEXER_MOUNT, "mode": "rw"}},
+        "labels": {"gcm-hosting.downloader": "1", INSTANCE_LABEL: config.INSTANCE},
+        # Streams in 1 MB chunks.
+        "mem_limit": "256m",
+        "remove": True,
+    }
+
+
+def _last_json(output, what):
+    """The last line a one-off container printed, parsed."""
+    lines = output.decode(errors="replace").strip().splitlines()
+    try:
+        return json.loads(lines[-1])
+    except (IndexError, ValueError):
+        return {"error": f"the {what} printed nothing useful: " + " ".join(lines[-3:])}
+
+
 def copy_spec(source, target):
     """docker-py's containers.run() arguments for copying one volume's
     files into another, owners and times kept (renaming a base: Docker
@@ -412,12 +541,12 @@ class DockerProvisioner:
     def index_shared_gamedata(self):
         """Runs INDEX_SCRIPT over GAMEDATA_SHARED_DIR; returns what it
         printed, parsed."""
-        output = self.client.containers.run(**indexer_spec())
-        lines = output.decode(errors="replace").strip().splitlines()
-        try:
-            return json.loads(lines[-1])
-        except (IndexError, ValueError):
-            return {"error": "the indexer printed nothing useful: " + " ".join(lines[-3:])}
+        return _last_json(self.client.containers.run(**indexer_spec()), "indexer")
+
+    def download_shared_gamedata(self):
+        """Runs DOWNLOAD_SCRIPT over GAMEDATA_SHARED_DIR; returns what it
+        printed, parsed. Takes minutes when there's a version to fetch."""
+        return _last_json(self.client.containers.run(**downloader_spec()), "downloader")
 
     def volume_sizes(self):
         """{slug: bytes} for every base's data volume, as Docker measures

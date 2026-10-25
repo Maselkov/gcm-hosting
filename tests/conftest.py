@@ -18,6 +18,8 @@ class FakeProvisioner:
         self.admins = {}  # slug -> admin names, for reset_admin_token()
         # What index_shared_gamedata() returns, or an exception it raises.
         self.index_result = {"versions": [{"version": "2.9.0", "state": "current"}]}
+        # What download_shared_gamedata() returns, or an exception it raises.
+        self.download_result = {"versions": [{"version": "2.9.0", "state": "current"}]}
         self.fail_admin = False
         self.private = set()
         self.fail_rename = False
@@ -92,6 +94,12 @@ class FakeProvisioner:
         if isinstance(self.index_result, Exception):
             raise self.index_result
         return self.index_result
+
+    def download_shared_gamedata(self):
+        self.calls.append(("download",))
+        if isinstance(self.download_result, Exception):
+            raise self.download_result
+        return self.download_result
 
     def volume_sizes(self):
         return dict(self.sizes)

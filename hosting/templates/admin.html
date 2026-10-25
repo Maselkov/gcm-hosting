@@ -58,6 +58,19 @@
     {% endfor %}
   </ul>
   {% elif gamedata.result %}<p class="hint">No versions in the shared folder.</p>{% endif %}
+  {% if gamedata_download is not none %}
+  <p class="hint">Every version {{ gamedata_repo }} publishes is downloaded there, every texture set, and again when it's rebuilt: at startup and on the same schedule.
+    {% if gamedata_download.at %}Last checked {{ gamedata_download.at|when }}.{% else %}Not checked yet: the first download takes a while.{% endif %}</p>
+  {% if gamedata_download.result and gamedata_download.result.error %}<p class="error">{{ gamedata_download.result.error }}</p>{% endif %}
+  {% set fetched = (gamedata_download.result or {}).get("versions") or [] %}
+  {% set just = fetched|selectattr("state", "equalto", "downloaded")|map(attribute="version")|list %}
+  {% set manual = fetched|selectattr("state", "equalto", "manual")|map(attribute="version")|list %}
+  {% if just %}<p class="hint">Just downloaded {{ just|join(", ") }}.</p>{% endif %}
+  {% if manual %}<p class="hint">Put there by hand, so left alone: {{ manual|join(", ") }}.</p>{% endif %}
+  {% for v in fetched if v.state == "failed" %}
+  <p class="error">Downloading {{ v.version }} failed: {{ v.error }}</p>
+  {% endfor %}
+  {% endif %}
   <form method="post" action="{{ url_for('admin.index_gamedata') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Index now</button></form>
 </section>
 {% endif %}

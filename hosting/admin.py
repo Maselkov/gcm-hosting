@@ -151,6 +151,8 @@ def overview():
         image=config.IMAGE,
         stats_seconds=config.STATS_SECONDS,
         gamedata=indexer.last() if indexer.enabled() else None,
+        gamedata_download=indexer.last_download() if indexer.downloading() else None,
+        gamedata_repo=config.GAMEDATA_REPO,
         gamedata_index_seconds=config.GAMEDATA_INDEX_SECONDS,
         quota_check_seconds=config.QUOTA_CHECK_SECONDS,
         csrf=auth.csrf_token(),

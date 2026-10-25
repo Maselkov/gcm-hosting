@@ -42,6 +42,12 @@ GAMEDATA_SHARED_DIR = os.environ.get("GAMEDATA_SHARED_DIR", "").strip()
 # (hosting/indexer.py); it's also done at startup and before a base is
 # made or recreated.
 GAMEDATA_INDEX_SECONDS = int(os.environ.get("GAMEDATA_INDEX_SECONDS", "900"))
+# Keep the shared folder holding every version GAMEDATA_REPO publishes
+# (gtnh-data-<version> releases, every texture set), checked as often as
+# it's indexed. 0: only what's put there by hand.
+GAMEDATA_DOWNLOAD = os.environ.get("GAMEDATA_DOWNLOAD", "1") != "0"
+GAMEDATA_REPO = os.environ.get("GAMEDATA_REPO", "Maselkov/gtnh-craft-monitor-data")
+GAMEDATA_API_URL = os.environ.get("GAMEDATA_API_URL", "https://api.github.com").rstrip("/")
 CERT_RESOLVER = os.environ.get("CERT_RESOLVER", "le")
 # Requests per second from one IP to one base (Traefik's ratelimit), on
 # average and in a burst; past them it answers 429. Generous: the page

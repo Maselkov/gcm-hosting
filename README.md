@@ -59,11 +59,23 @@ on the base's own page).
 ### Shared game data
 
 Each base needs a GTNH version's game data (icons and item catalog,
-about 300 MB). Set `GAMEDATA_SHARED_DIR` to an absolute path on the host
-holding `<version>/` folders, laid out like a server's
-`data/gamedata/` (copy them from any server that downloaded them), and
-every base reads them from there, mounted read-only, instead of each
-downloading its own. Replace a folder there when its version is rebuilt.
+about 300 MB per texture set). Set `GAMEDATA_SHARED_DIR` to an absolute
+path on the host and every base reads `<version>/` folders from there,
+mounted read-only, instead of each downloading its own.
+
+This app fills it: every version `GAMEDATA_REPO`
+(`Maselkov/gtnh-craft-monitor-data`) publishes, with every texture set,
+at startup and every `GAMEDATA_INDEX_SECONDS`, and again when a release
+is rebuilt. That's about 8.5 GB for the 8 versions out now, and growing
+by about 1.2 GB per release. It runs in a short-lived container of the
+bases' `IMAGE` with network access, as the folder's owner, downloads
+into `.incoming/` and swaps each version in whole. The first run takes
+a while; until a version is there, a base that picks it downloads its
+own. A `<version>/` folder you put there yourself (one without a
+`release.json`) is left alone. `GAMEDATA_DOWNLOAD=0` turns this off:
+then copy `<version>/` folders in from any server that downloaded them,
+laid out like its `data/gamedata/`, and replace one when its version is
+rebuilt.
 Each version also needs an index there (its icon and item lookups as one
 file, read in place), or every base builds its own copy of it. This app
 builds them for you: with the bases' `IMAGE`, since an index's format
