@@ -26,4 +26,12 @@ if __name__ == "__main__":
     quota.start(provisioner)
     activity.start(provisioner)
     stats.start(provisioner)
-    serve(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8000")), threads=8)
+    # Keep Traefik's X-Forwarded-* for ProxyFix (hosting/__init__.py):
+    # waitress drops them otherwise, and Discord's redirect_uri came out http.
+    serve(
+        app,
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", "8000")),
+        threads=8,
+        clear_untrusted_proxy_headers=False,
+    )
