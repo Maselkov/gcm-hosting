@@ -75,6 +75,12 @@ QUOTA_CHECK_SECONDS = int(os.environ.get("QUOTA_CHECK_SECONDS", "300"))
 # levels off around 100 MB in its first year.
 HISTORY_HOURLY_AFTER_DAYS = os.environ.get("HISTORY_HOURLY_AFTER_DAYS", "7")
 HISTORY_DAILY_AFTER_DAYS = os.environ.get("HISTORY_DAILY_AFTER_DAYS", "30")
+# The only hostnames a base's admins may point its webhooks at
+# (WEBHOOK_HOSTS in the base: exact names, comma-separated), so a base
+# can't make this host post just anywhere. Empty: any.
+WEBHOOK_HOSTS = os.environ.get(
+    "WEBHOOK_HOSTS", "discord.com,discordapp.com,ptb.discord.com,canary.discord.com,hooks.slack.com"
+).strip()
 
 # Names a base can't be renamed to (the control panel), as they're, or
 # may become, another site's under DOMAIN - the testing instance at

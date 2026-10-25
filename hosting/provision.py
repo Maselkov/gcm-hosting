@@ -337,6 +337,7 @@ def container_spec(slug, api_key):
         "TRUSTED_PROXIES": config.NETWORK_SUBNET,
         "HISTORY_HOURLY_AFTER_DAYS": config.HISTORY_HOURLY_AFTER_DAYS,
         "HISTORY_DAILY_AFTER_DAYS": config.HISTORY_DAILY_AFTER_DAYS,
+        "WEBHOOK_HOSTS": config.WEBHOOK_HOSTS,
     }
     volumes = {
         volume_name(slug): {"bind": DATA_PATH, "mode": "rw"},
