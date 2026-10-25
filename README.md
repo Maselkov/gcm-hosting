@@ -21,8 +21,9 @@ You need a host with Docker, ports 80 and 443 open, and DNS for both
 2. `cp .env.example .env` and fill it in.
 3. `docker compose up -d --build`
 
-CI publishes the image as `ghcr.io/maselkov/gcm-hosting` (`latest` from
-`main`, `1.2.3` and `1.2` from a `v1.2.3` tag); to use it instead of
+`publish.yml` publishes the image as `ghcr.io/maselkov/gcm-hosting` once
+the tests pass (`latest` from `main`, `1.2.3` and `1.2` from a `v1.2.3`
+tag); to use it instead of
 building, put `image: ghcr.io/maselkov/gcm-hosting:latest` in place of
 `build: .` in `docker-compose.yml`.
 
@@ -149,5 +150,11 @@ uv venv .venv && uv pip install -p .venv -r requirements-dev.txt
 ```
 
 `DOMAIN=localhost DEV_LOGIN=1 python app.py` runs it without Discord:
-sign in with any name. With a local Traefik on the `gcm-bases` network,
+sign in with any name. It refuses to start with `DEV_LOGIN` unless
+`DOMAIN` is `localhost` or a reserved test name (`*.localhost`, `*.test`,
+`*.example`, `*.invalid`), so it can't end up on a public site. With a local Traefik on the `gcm-bases` network,
 bases answer at `http://<name>.localhost`.
+
+## License
+
+GPL-3.0, like GTNH Craft Monitor itself: see [LICENSE](LICENSE).

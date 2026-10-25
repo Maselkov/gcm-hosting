@@ -13,8 +13,12 @@ DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(os.path.dirna
 DISCORD_CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID", "")
 DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
 DISCORD_API_URL = os.environ.get("DISCORD_API_URL", "https://discord.com/api").rstrip("/")
-# Sign in as anyone by name, without Discord. For local testing only.
+# Sign in as anyone by name, without Discord. For local testing only: the
+# app won't start with it unless DOMAIN is a name that can never be a
+# public site (is_test_domain()).
 DEV_LOGIN = os.environ.get("DEV_LOGIN", "") == "1"
+# Reserved for testing, never delegated (RFC 2606, RFC 6761).
+TEST_DOMAIN_SUFFIXES = (".localhost", ".test", ".example", ".invalid")
 # Who may use the control panel (/admin): comma-separated identities, as
 # accounts sign in - "discord:<user id>", or "dev:<name>" with DEV_LOGIN.
 ADMIN_IDENTITIES = {i.strip() for i in os.environ.get("ADMIN_IDENTITIES", "").split(",") if i.strip()}
@@ -56,6 +60,10 @@ HISTORY_DAILY_AFTER_DAYS = os.environ.get("HISTORY_DAILY_AFTER_DAYS", "30")
 
 MAX_BASES_PER_ACCOUNT = int(os.environ.get("MAX_BASES_PER_ACCOUNT", "1"))
 MAX_BASES = int(os.environ.get("MAX_BASES", "10"))
+
+
+def is_test_domain():
+    return DOMAIN == "localhost" or DOMAIN.endswith(TEST_DOMAIN_SUFFIXES)
 
 
 def base_url(slug):

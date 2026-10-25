@@ -98,7 +98,7 @@ def app(tmp_path, monkeypatch, provisioner):
     monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(config, "SECRET_KEY", "test-secret")
     monkeypatch.setattr(config, "DEV_LOGIN", True)
-    monkeypatch.setattr(config, "DOMAIN", "example.net")
+    monkeypatch.setattr(config, "DOMAIN", "example.test")
     monkeypatch.setattr(config, "GAMEDATA_SHARED_DIR", "")
     indexer.reset()
     return create_app(provisioner)

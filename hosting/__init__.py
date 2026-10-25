@@ -14,6 +14,12 @@ CSP = (
 
 
 def create_app(provisioner=None):
+    if config.DEV_LOGIN and not config.is_test_domain():
+        # Anyone could sign in as anyone - an operator included.
+        raise RuntimeError(
+            f"DEV_LOGIN is for local testing only, and DOMAIN is {config.DOMAIN}. Unset DEV_LOGIN, "
+            "or use localhost or a reserved test name (*.localhost, *.test, *.example, *.invalid)."
+        )
     if not config.SECRET_KEY and not config.DEV_LOGIN:
         raise RuntimeError("Set SECRET_KEY to a long random string.")
     app = Flask(__name__)
