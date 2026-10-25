@@ -72,6 +72,8 @@ class DockerProvisioner:
         self.errors = docker.errors
 
     def create(self, slug, api_key):
+        # Made first, so it carries the label volume_sizes() finds it by.
+        self.client.volumes.create(volume_name(slug), labels={LABEL: slug})
         self.client.containers.run(**container_spec(slug, api_key))
 
     def create_admin(self, slug, name, timeout=60):
@@ -92,6 +94,29 @@ class DockerProvisioner:
         if result.exit_code != 0:
             raise RuntimeError(f"create-admin failed for {slug}: {output}")
         return output.splitlines()[-1]
+
+    def volume_sizes(self):
+        """{slug: bytes} for every base's data volume, as Docker measures
+        them (it walks each volume, so not every request)."""
+        sizes = {}
+        for volume in self.client.df().get("Volumes") or []:
+            slug = (volume.get("Labels") or {}).get(LABEL)
+            size = (volume.get("UsageData") or {}).get("Size", -1)
+            if slug and size >= 0:
+                sizes[slug] = size
+        return sizes
+
+    def stop(self, slug):
+        try:
+            self.client.containers.get(container_name(slug)).stop()
+        except self.errors.NotFound:
+            pass
+
+    def start(self, slug):
+        try:
+            self.client.containers.get(container_name(slug)).start()
+        except self.errors.NotFound:
+            pass
 
     def status(self, slug):
         """running, exited, ..., or None if there's no container."""

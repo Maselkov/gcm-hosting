@@ -37,7 +37,12 @@
   <h2>Your bases</h2>
   {% for base in bases %}
   <article class="base">
-    <h3><a href="{{ base.url }}">{{ base.slug }}.{{ domain }}</a> <span class="status">{{ base.status or "missing" }}</span></h3>
+    <h3><a href="{{ base.url }}">{{ base.slug }}.{{ domain }}</a> <span class="status">{{ "over quota" if base.suspended_at else (base.status or "missing") }}</span></h3>
+    {% if base.suspended_at %}
+    <p class="error">Stopped: it's using {{ base.size_bytes|bytes }}, over its {{ base.quota_bytes|bytes }} quota. Ask the host to raise it, or delete the base.</p>
+    {% else %}
+    <p class="hint">Disk: {{ base.size_bytes|bytes }} of {{ base.quota_bytes|bytes }}.</p>
+    {% endif %}
     <details>
       <summary>In-game settings</summary>
       <p>The Connect a computer command on your base's page fills these in for you.</p>

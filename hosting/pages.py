@@ -28,6 +28,18 @@ def slug_problem(slug):
     return None
 
 
+def human_bytes(n):
+    for unit in ("bytes", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f} {unit}" if unit == "bytes" else f"{n:.1f} {unit}"
+        n /= 1024
+
+
+@bp.app_template_filter("bytes")
+def bytes_filter(n):
+    return human_bytes(n) if n is not None else "not measured yet"
+
+
 def render_index(error=None, created=None, status=200):
     account = auth.current_account()
     bases = []

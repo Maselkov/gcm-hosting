@@ -30,6 +30,11 @@ MEMORY_LIMIT = os.environ.get("MEMORY_LIMIT", "256m")
 CPU_LIMIT = float(os.environ.get("CPU_LIMIT", "0.5"))
 PIDS_LIMIT = int(os.environ.get("PIDS_LIMIT", "128"))
 
+# Disk quota per base (hosting/quota.py): checked every
+# QUOTA_CHECK_SECONDS; a base over it is stopped until it's raised.
+QUOTA_BYTES = int(float(os.environ.get("QUOTA_GB", "1")) * 1024**3)
+QUOTA_CHECK_SECONDS = int(os.environ.get("QUOTA_CHECK_SECONDS", "300"))
+
 MAX_BASES_PER_ACCOUNT = int(os.environ.get("MAX_BASES_PER_ACCOUNT", "1"))
 MAX_BASES = int(os.environ.get("MAX_BASES", "30"))
 

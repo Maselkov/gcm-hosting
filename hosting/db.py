@@ -23,7 +23,13 @@ CREATE TABLE IF NOT EXISTS bases (
     -- Kept so the owner can see their config.lua again. The base holds
     -- the same key in its environment.
     api_key TEXT NOT NULL,
-    created_at REAL NOT NULL
+    created_at REAL NOT NULL,
+    -- Disk quota (hosting/quota.py): NULL is config.QUOTA_BYTES.
+    quota_bytes INTEGER,
+    -- Its data volume's size at the last check.
+    size_bytes INTEGER,
+    -- Set while it's stopped for being over quota.
+    suspended_at REAL
 );
 """
 
@@ -68,13 +74,48 @@ def account(account_id):
     return {"id": row[0], "name": row[1]} if row else None
 
 
+BASE_COLUMNS = "slug, api_key, created_at, quota_bytes, size_bytes, suspended_at"
+
+
+def _base(row):
+    slug, api_key, created_at, quota, size, suspended_at = row
+    return {
+        "slug": slug,
+        "api_key": api_key,
+        "created_at": created_at,
+        "quota_bytes": quota if quota is not None else config.QUOTA_BYTES,
+        "size_bytes": size,
+        "suspended_at": suspended_at,
+    }
+
+
 def bases_of(account_id):
     with transaction() as conn:
         rows = conn.execute(
-            "SELECT slug, api_key, created_at FROM bases WHERE owner_id = ? ORDER BY created_at",
+            f"SELECT {BASE_COLUMNS} FROM bases WHERE owner_id = ? ORDER BY created_at",
             (account_id,),
         ).fetchall()
-    return [{"slug": s, "api_key": k, "created_at": c} for s, k, c in rows]
+    return [_base(r) for r in rows]
+
+
+def all_bases():
+    with transaction() as conn:
+        rows = conn.execute(f"SELECT {BASE_COLUMNS} FROM bases ORDER BY slug").fetchall()
+    return [_base(r) for r in rows]
+
+
+def record_size(slug, size_bytes, suspended_at):
+    with transaction() as conn:
+        conn.execute(
+            "UPDATE bases SET size_bytes = ?, suspended_at = ? WHERE slug = ?",
+            (size_bytes, suspended_at, slug),
+        )
+
+
+def set_quota(slug, quota_bytes):
+    """Returns False if there's no such base."""
+    with transaction() as conn:
+        return conn.execute("UPDATE bases SET quota_bytes = ? WHERE slug = ?", (quota_bytes, slug)).rowcount == 1
 
 
 def claim_base(slug, owner_id, api_key):

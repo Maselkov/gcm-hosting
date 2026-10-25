@@ -43,6 +43,22 @@ Each base runs with `MEMORY_LIMIT` (256 MB), `CPU_LIMIT` (half a core)
 and 128 processes. An idle base uses about 85 MB, so a 4 GB host fits
 roughly 30 (`MAX_BASES`). `MAX_BASES_PER_ACCOUNT` defaults to 1.
 
+**Disk.** Docker can't cap a volume's size, so this app measures every
+base's data volume every `QUOTA_CHECK_SECONDS` (300) and stops one over
+`QUOTA_GB` (1). Its card then says it's over quota; the owner can still
+delete it. To give a base more room (it starts again at once if it fits):
+
+```bash
+docker compose exec hosting python app.py set-quota <name> <GB>
+```
+
+A base can still grow past its quota between checks, so keep Docker's
+volumes (`/var/lib/docker/volumes`, or Docker's whole `data-root`) on
+their own partition: a base filling it can't take down the host or this
+app's database with it. Servers from GTNH Craft Monitor 5.2 on also
+refuse oversized network scans (`MAX_SCAN_ITEMS`), which stops the
+quickest way to fill one.
+
 ## Things to know before opening it to the public
 
 - **The Docker socket is root on the host.** This app needs it to start

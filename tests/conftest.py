@@ -10,6 +10,8 @@ class FakeProvisioner:
 
     def __init__(self):
         self.running = {}
+        self.stopped = set()
+        self.sizes = {}
         self.fail_admin = False
 
     def create(self, slug, api_key):
@@ -21,11 +23,23 @@ class FakeProvisioner:
             raise RuntimeError("container exited")
         return f"gcm_token_for_{name}"
 
+    def volume_sizes(self):
+        return dict(self.sizes)
+
+    def stop(self, slug):
+        self.stopped.add(slug)
+
+    def start(self, slug):
+        self.stopped.discard(slug)
+
     def status(self, slug):
-        return "running" if slug in self.running else None
+        if slug not in self.running:
+            return None
+        return "exited" if slug in self.stopped else "running"
 
     def remove(self, slug):
         self.running.pop(slug, None)
+        self.stopped.discard(slug)
 
 
 @pytest.fixture()
