@@ -43,8 +43,8 @@ jobs:
           ENVIRONMENT: ${{ inputs.environment }}
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           # The tags publish.yml gives this ref's image.
           if [[ $GITHUB_REF_TYPE == tag ]]; then tag=${GITHUB_REF_NAME#v}; else tag=sha-${GITHUB_SHA::7}; fi
