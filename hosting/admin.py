@@ -11,7 +11,7 @@ import time
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 
-from hosting import activity, auth, config, db, indexer, provision, quota, stats
+from hosting import activity, auth, config, db, indexer, provision, quota, stats, upgrade
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 log = logging.getLogger("hosting.admin")
@@ -47,6 +47,7 @@ def _uptime(started_at):
 
 def _rows():
     details = provisioner().details()
+    current = provisioner().image_id()
     live = stats.current()
     rows = []
     for base in db.all_bases():
@@ -66,7 +67,11 @@ def _rows():
             "status": status,
             "state": state,
             "image": container.get("image"),
-            "image_current": container.get("image") == config.IMAGE,
+            "version": container.get("version"),
+            # By ID: a moved tag (latest) keeps its name.
+            "image_current": container.get("image_id") == current
+            if current
+            else container.get("image") == config.IMAGE,
             "uptime": _uptime(container.get("started_at")),
             "restarts": container.get("restarts", 0),
             "oom_killed": container.get("oom_killed", False),
@@ -262,9 +267,7 @@ def recreate(slug):
     # A new image may read a new index format: built in the shared folder
     # first, so the base doesn't build its own.
     indexer.run(provisioner())
-    provisioner().recreate(slug, base["api_key"])
-    if base["suspended_at"] or base["held_at"]:
-        provisioner().stop(slug)
+    upgrade.recreate(provisioner(), base)
     return _done(slug, f"Recreated from {config.IMAGE}, keeping its data.")
 
 

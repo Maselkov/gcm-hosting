@@ -12,18 +12,19 @@ import threading
 
 from waitress import serve
 
-from hosting import activity, config, create_app, db, indexer, quota, stats
+from hosting import activity, config, create_app, db, indexer, quota, stats, upgrade
 
 log = logging.getLogger("hosting")
 
 
 def warm_up(provisioner):
-    """Pulls IMAGE, then starts the indexer with it."""
+    """Pulls IMAGE, then starts the indexer with it, then the upgrades."""
     if provisioner.pull_image():
         log.info("Pulled %s", config.IMAGE)
     else:
         log.warning("Couldn't pull %s: using the local copy, if there is one", config.IMAGE)
     indexer.start(provisioner)
+    upgrade.start(provisioner)
 
 
 if __name__ == "__main__":
