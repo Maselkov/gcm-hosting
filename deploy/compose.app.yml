@@ -36,6 +36,13 @@ services:
       # The client, also behind a front proxy (compose.edge.yml).
       - traefik.http.middlewares.${INSTANCE}-ratelimit.ratelimit.sourcecriterion.requestheadername=X-Real-Ip
       - traefik.http.routers.${INSTANCE}.middlewares=${INSTANCE}-ratelimit
+      # <slug>.DOMAIN with no base at it: a page saying so, not Traefik's
+      # bare 404. Lowest priority, so any base's own router comes first.
+      - traefik.http.routers.${INSTANCE}-missing.rule=HostRegexp(`^[a-z0-9-]+\.${DOMAIN}$$`)
+      - traefik.http.routers.${INSTANCE}-missing.priority=1
+      - traefik.http.routers.${INSTANCE}-missing.entrypoints=websecure
+      - traefik.http.routers.${INSTANCE}-missing.tls.certresolver=le
+      - traefik.http.routers.${INSTANCE}-missing.middlewares=${INSTANCE}-ratelimit
     networks:
       - gcm-control
 

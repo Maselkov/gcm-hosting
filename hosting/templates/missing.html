@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>No base here</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main>
+  <h1>No base here</h1>
+  <p class="lede">There's no GTNH Craft Monitor base at <b>{{ host }}</b>.</p>
+  <p>Check the address for a typo. If it worked before, the base may have been renamed or removed: its owner can see its address after signing in.</p>
+  <p><a class="button big" href="{{ home }}">Go to the main page →</a></p>
+</main>
+</body>
+</html>
