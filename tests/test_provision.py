@@ -15,7 +15,10 @@ def test_a_base_container_is_routed_limited_and_isolated(monkeypatch):
     assert labels["traefik.http.routers.gcm-alice.middlewares"] == "gcm-alice-ratelimit"
     assert labels["traefik.http.middlewares.gcm-alice-ratelimit.ratelimit.average"] == "50"
     assert labels["traefik.http.middlewares.gcm-alice-ratelimit.ratelimit.burst"] == "500"
-    assert labels["traefik.http.middlewares.gcm-alice-ratelimit.ratelimit.sourcecriterion.requestheadername"] == "X-Real-Ip"
+    assert (
+        labels["traefik.http.middlewares.gcm-alice-ratelimit.ratelimit.sourcecriterion.requestheadername"]
+        == "X-Real-Ip"
+    )
     assert labels["traefik.http.services.gcm-alice.loadbalancer.server.port"] == "8420"
     env = spec["environment"]
     assert env["API_KEY"] == "k" * 64
