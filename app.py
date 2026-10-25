@@ -2,7 +2,7 @@
 
 Raise (or lower) one base's disk quota; a base stopped for being over it
 starts again at once if it now fits:
-    python app.py set-quota <slug> <GB>
+    python app.py set-quota <slug> <MB>
 """
 
 import logging
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     app = create_app()
     provisioner = app.config["PROVISIONER"]
     if len(sys.argv) == 4 and sys.argv[1] == "set-quota":
-        if not db.set_quota(sys.argv[2], int(float(sys.argv[3]) * 1024**3)):
+        if not db.set_quota(sys.argv[2], int(float(sys.argv[3]) * 1024**2)):
             raise SystemExit(f"No base named {sys.argv[2]!r}")
         quota.check(provisioner)
         sys.exit(0)

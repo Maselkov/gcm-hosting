@@ -45,12 +45,21 @@ roughly 30 (`MAX_BASES`). `MAX_BASES_PER_ACCOUNT` defaults to 1.
 
 **Disk.** Docker can't cap a volume's size, so this app measures every
 base's data volume every `QUOTA_CHECK_SECONDS` (300) and stops one over
-`QUOTA_GB` (1). Its card then says it's over quota; the owner can still
+`QUOTA_MB` (200). Its card then says it's over quota; the owner can still
 delete it. To give a base more room (it starts again at once if it fits):
 
 ```bash
-docker compose exec hosting python app.py set-quota <name> <GB>
+docker compose exec hosting python app.py set-quota <name> <MB>
 ```
+
+What fills a base is its item history: about 28 bytes per item each time
+its count changes. A busy base (2000 items changing every 10-minute scan)
+writes about 7.6 MB a day, so bases thin it sooner than a self-hosted
+server does: full detail for `HISTORY_HOURLY_AFTER_DAYS` (7), hourly to
+`HISTORY_DAILY_AFTER_DAYS` (30), daily after. That levels such a base off
+around 100 MB in its first year. Game data a base downloads itself (a
+version or textures missing from `GAMEDATA_SHARED_DIR`, ~300 MB each) is
+on a second volume that doesn't count; the base keeps at most two.
 
 A base can still grow past its quota between checks, so keep Docker's
 volumes (`/var/lib/docker/volumes`, or Docker's whole `data-root`) on

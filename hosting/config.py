@@ -32,8 +32,16 @@ PIDS_LIMIT = int(os.environ.get("PIDS_LIMIT", "128"))
 
 # Disk quota per base (hosting/quota.py): checked every
 # QUOTA_CHECK_SECONDS; a base over it is stopped until it's raised.
-QUOTA_BYTES = int(float(os.environ.get("QUOTA_GB", "1")) * 1024**3)
+# Game data a base downloads itself is on a separate volume and doesn't
+# count (the base keeps at most two versions of it).
+QUOTA_BYTES = int(float(os.environ.get("QUOTA_MB", "200")) * 1024**2)
 QUOTA_CHECK_SECONDS = int(os.environ.get("QUOTA_CHECK_SECONDS", "300"))
+# Bases' item history thinning (HISTORY_*_AFTER_DAYS in the base), sooner
+# than a self-hosted server's 30/365 to fit the quota: a busy base, 2000
+# items changing every scan, writes ~7.6 MB a day of full history, so it
+# levels off around 100 MB in its first year.
+HISTORY_HOURLY_AFTER_DAYS = os.environ.get("HISTORY_HOURLY_AFTER_DAYS", "7")
+HISTORY_DAILY_AFTER_DAYS = os.environ.get("HISTORY_DAILY_AFTER_DAYS", "30")
 
 MAX_BASES_PER_ACCOUNT = int(os.environ.get("MAX_BASES_PER_ACCOUNT", "1"))
 MAX_BASES = int(os.environ.get("MAX_BASES", "30"))

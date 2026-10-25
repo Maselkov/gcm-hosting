@@ -11,6 +11,7 @@ import time
 from hosting import config
 
 DATA_PATH = "/app/data"
+OWN_GAMEDATA_PATH = "/app/data/gamedata"
 SHARED_GAMEDATA_PATH = "/gamedata-shared"
 PORT = 8420
 LABEL = "gcm-hosting.slug"
@@ -22,6 +23,12 @@ def container_name(slug):
 
 def volume_name(slug):
     return f"gcm-base-{slug}-data"
+
+
+def gamedata_volume_name(slug):
+    """Game data the base downloads itself: kept apart from its data
+    volume so it doesn't count toward the quota."""
+    return f"gcm-base-{slug}-gamedata"
 
 
 def container_spec(slug, api_key):
@@ -42,8 +49,13 @@ def container_spec(slug, api_key):
         "PUBLIC_URL": config.base_url(slug),
         "SESSION_COOKIE_SECURE": "0" if config.DOMAIN == "localhost" else "1",
         "TRUSTED_PROXIES": config.NETWORK_SUBNET,
+        "HISTORY_HOURLY_AFTER_DAYS": config.HISTORY_HOURLY_AFTER_DAYS,
+        "HISTORY_DAILY_AFTER_DAYS": config.HISTORY_DAILY_AFTER_DAYS,
     }
-    volumes = {volume_name(slug): {"bind": DATA_PATH, "mode": "rw"}}
+    volumes = {
+        volume_name(slug): {"bind": DATA_PATH, "mode": "rw"},
+        gamedata_volume_name(slug): {"bind": OWN_GAMEDATA_PATH, "mode": "rw"},
+    }
     if config.GAMEDATA_SHARED_DIR:
         environment["GAMEDATA_SHARED_DIR"] = SHARED_GAMEDATA_PATH
         volumes[config.GAMEDATA_SHARED_DIR] = {"bind": SHARED_GAMEDATA_PATH, "mode": "ro"}
@@ -74,6 +86,7 @@ class DockerProvisioner:
     def create(self, slug, api_key):
         # Made first, so it carries the label volume_sizes() finds it by.
         self.client.volumes.create(volume_name(slug), labels={LABEL: slug})
+        self.client.volumes.create(gamedata_volume_name(slug), labels={"gcm-hosting.gamedata": slug})
         self.client.containers.run(**container_spec(slug, api_key))
 
     def create_admin(self, slug, name, timeout=60):
@@ -131,7 +144,8 @@ class DockerProvisioner:
             self.client.containers.get(container_name(slug)).remove(force=True)
         except self.errors.NotFound:
             pass
-        try:
-            self.client.volumes.get(volume_name(slug)).remove(force=True)
-        except self.errors.NotFound:
-            pass
+        for name in (volume_name(slug), gamedata_volume_name(slug)):
+            try:
+                self.client.volumes.get(name).remove(force=True)
+            except self.errors.NotFound:
+                pass

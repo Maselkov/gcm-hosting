@@ -19,8 +19,11 @@ def test_a_base_container_is_routed_limited_and_isolated(monkeypatch):
     assert env["GAMEDATA_SHARED_DIR"] == "/gamedata-shared"
     assert spec["volumes"] == {
         "gcm-base-alice-data": {"bind": "/app/data", "mode": "rw"},
+        # Downloads of its own, outside the quota.
+        "gcm-base-alice-gamedata": {"bind": "/app/data/gamedata", "mode": "rw"},
         "/srv/gamedata": {"bind": "/gamedata-shared", "mode": "ro"},
     }
+    assert env["HISTORY_HOURLY_AFTER_DAYS"] == "7" and env["HISTORY_DAILY_AFTER_DAYS"] == "30"
     assert spec["cap_drop"] == ["ALL"] and spec["mem_limit"] and spec["pids_limit"]
 
 
@@ -28,4 +31,4 @@ def test_without_shared_game_data_each_base_has_only_its_own_volume(monkeypatch)
     monkeypatch.setattr(config, "GAMEDATA_SHARED_DIR", "")
     spec = provision.container_spec("bob", "k" * 64)
     assert "GAMEDATA_SHARED_DIR" not in spec["environment"]
-    assert list(spec["volumes"]) == ["gcm-base-bob-data"]
+    assert list(spec["volumes"]) == ["gcm-base-bob-data", "gcm-base-bob-gamedata"]
