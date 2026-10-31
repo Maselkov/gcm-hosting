@@ -7,7 +7,9 @@ Bases never run code their players supply, so sharing one network is
 safe; the limits keep one busy base from starving the rest."""
 
 import datetime
+import io
 import json
+import tarfile
 import time
 
 from hosting import config
@@ -15,6 +17,8 @@ from hosting import config
 DATA_PATH = "/app/data"
 OWN_GAMEDATA_PATH = "/app/data/gamedata"
 SHARED_GAMEDATA_PATH = "/gamedata-shared"
+# Where a base keeps the GTNH version its admins picked (gcm/gamedata.py).
+SELECTED_GAMEDATA_FILE = OWN_GAMEDATA_PATH + "/selected.json"
 PORT = 8420
 LABEL = "gcm-hosting.slug"
 # Which instance (config.INSTANCE) a base's container and volumes belong
@@ -427,6 +431,20 @@ class DockerProvisioner:
         if result.exit_code != 0:
             raise RuntimeError(f"last report of {slug} unknown: {output[-300:]}")
         return json.loads(output.splitlines()[-1])
+
+    def gamedata(self, slug):
+        """{version, textures} of the game data slug's admins picked
+        (Settings → Game data), or None if none or it can't tell. Copied out
+        like `docker cp`, so a stopped base's shows too."""
+        try:
+            stream, _ = self.client.containers.get(container_name(slug)).get_archive(SELECTED_GAMEDATA_FILE)
+            with tarfile.open(fileobj=io.BytesIO(b"".join(stream))) as tar:
+                data = json.load(tar.extractfile(tar.getmembers()[0]))
+        except (self.errors.APIError, tarfile.TarError, IndexError, ValueError):
+            return None
+        if not isinstance(data, dict) or not data.get("version"):
+            return None
+        return {"version": data["version"], "textures": data.get("textures") or "default"}
 
     def make_private(self, slug):
         """Only the base's signed-in users see its crafts, network and
