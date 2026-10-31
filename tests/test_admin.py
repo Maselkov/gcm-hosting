@@ -148,6 +148,12 @@ def test_base_page_shows_its_logs_and_settings(operator, bases):
     assert db.base("alice")["api_key"] in page
 
 
+def test_base_page_shows_the_game_data_it_picked(operator, bases):
+    assert "no game data picked" in operator.get("/admin/bases/alice").get_data(as_text=True)
+    bases.picked["alice"] = {"version": "2.8.0", "textures": "faithful32"}
+    assert "GTNH 2.8.0 (faithful32)" in operator.get("/admin/bases/alice").get_data(as_text=True)
+
+
 def test_stats_forget_bases_that_stop_or_go(bases):
     bases.samples = {"alice": (0, 0, 1, MB, 2 * MB), "bob": (0, 0, 1, MB, 2 * MB)}
     stats.sample_all(bases)

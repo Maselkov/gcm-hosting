@@ -195,6 +195,7 @@ def _render_base(slug, token=None, status=200):
             "admin_base.html",
             base=row,
             logs=provisioner().logs(slug),
+            gamedata=provisioner().gamedata(slug),
             token=token,
             image=config.IMAGE,
             default_quota_bytes=config.QUOTA_BYTES,

@@ -25,6 +25,7 @@ class FakeProvisioner:
         self.private = set()
         self.fail_rename = False
         self.reports = {}  # slug -> last_report()'s answer, or an exception
+        self.picked = {}  # slug -> gamedata()'s answer
         self.fail_private = False
         self.current_image = "sha256:new"  # what image_id() returns
         self.images = {}  # slug -> its container's image ID, if not the current one
@@ -43,6 +44,9 @@ class FakeProvisioner:
         if isinstance(report, Exception):
             raise report
         return report
+
+    def gamedata(self, slug):
+        return self.picked.get(slug)
 
     def rename(self, old, new, api_key):
         if self.fail_rename:
