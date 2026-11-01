@@ -154,6 +154,7 @@ def overview():
         sort=sort,
         refresh=_refresh(),
         image=config.IMAGE,
+        upgrade_check_seconds=config.UPGRADE_CHECK_SECONDS,
         stats_seconds=config.STATS_SECONDS,
         gamedata=indexer.last() if indexer.enabled() else None,
         gamedata_download=indexer.last_download() if indexer.downloading() else None,
@@ -259,6 +260,21 @@ def restart(slug):
         return redirect(url_for("admin.base_page", slug=slug))
     provisioner().restart(slug)
     return _done(slug, "Restarted.")
+
+
+@bp.route("/upgrade", methods=["POST"])
+@auth.operator_required
+def upgrade_now():
+    auth.check_csrf()
+    upgraded = upgrade.check(provisioner())
+    if upgraded is None:
+        flash(f"Couldn't pull {config.IMAGE}: nothing was upgraded.")
+    elif upgraded:
+        flash(f"Recreated {', '.join(upgraded)} on the new {config.IMAGE}.")
+    else:
+        flash(f"Every base is already on the newest {config.IMAGE}.")
+    log.info("upgrade check (by %s): %s", auth.current_account()["identity"], upgraded)
+    return redirect(url_for("admin.overview"))
 
 
 @bp.route("/bases/<slug>/recreate", methods=["POST"])

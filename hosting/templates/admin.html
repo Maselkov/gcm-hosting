@@ -45,6 +45,12 @@
   </div>
 </section>
 
+<section class="upgrade">
+  <h2>Image</h2>
+  <p class="hint">Bases follow {{ image }}: it's pulled{% if upgrade_check_seconds %} at startup and every {{ "%d min" % (upgrade_check_seconds // 60) if upgrade_check_seconds >= 60 else "%ds" % upgrade_check_seconds }}{% else %} only when you check{% endif %}, and a base on an older image is recreated on the new one, keeping its data. Checking pulls it now; a new image takes a while.</p>
+  <form method="post" action="{{ url_for('admin.upgrade_now') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">Check for upgrades now</button></form>
+</section>
+
 {% if gamedata is not none %}
 <section class="gamedata">
   <h2>Shared game data</h2>

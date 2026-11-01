@@ -1,5 +1,5 @@
 import pytest
-from conftest import make_base, sign_in
+from conftest import csrf, make_base, sign_in
 
 from hosting import config, db, upgrade
 
@@ -37,7 +37,7 @@ def test_bases_already_current_are_left_alone(bases):
 def test_a_failed_pull_upgrades_nothing(bases):
     bases.images["alice"] = "sha256:old"
     bases.pull_works = False
-    assert upgrade.check(bases) == []
+    assert upgrade.check(bases) is None
     assert recreated(bases) == []
 
 
@@ -74,3 +74,23 @@ def test_off_without_a_check_interval(provisioner, monkeypatch):
     monkeypatch.setattr(config, "UPGRADE_CHECK_SECONDS", 0)
     upgrade.start(provisioner)
     assert provisioner.calls == []
+
+
+def test_the_control_panel_checks_on_request(operator, bases):
+    bases.images["alice"] = "sha256:old"
+    page = operator.post("/admin/upgrade", data={"csrf": csrf(operator)}, follow_redirects=True).get_data(as_text=True)
+    assert "Recreated alice on the new" in page
+    assert recreated(bases) == ["alice"]
+    page = operator.post("/admin/upgrade", data={"csrf": csrf(operator)}, follow_redirects=True).get_data(as_text=True)
+    assert "Every base is already on the newest" in page
+    bases.pull_works = False
+    page = operator.post("/admin/upgrade", data={"csrf": csrf(operator)}, follow_redirects=True).get_data(as_text=True)
+    assert "Couldn&#39;t pull" in page
+    assert operator.post("/admin/upgrade").status_code == 400  # no CSRF token
+
+
+def test_players_cant_check(app, bases):
+    player = app.test_client()
+    sign_in(player, "Alice")
+    assert player.post("/admin/upgrade", data={"csrf": csrf(player)}).status_code == 404
+    assert recreated(bases) == []
