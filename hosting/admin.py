@@ -277,6 +277,18 @@ def upgrade_now():
     return redirect(url_for("admin.overview"))
 
 
+@bp.route("/recreate-all", methods=["POST"])
+@auth.operator_required
+def recreate_all():
+    auth.check_csrf()
+    recreated = upgrade.recreate_all(provisioner())
+    missed = len(db.all_bases()) - len(recreated)
+    message = f"Recreated {len(recreated)} base{'' if len(recreated) == 1 else 's'} from {config.IMAGE}"
+    flash(f"{message}; {missed} failed, see the log." if missed else f"{message}.")
+    log.info("recreate all (by %s): %s", auth.current_account()["identity"], recreated)
+    return redirect(url_for("admin.overview"))
+
+
 @bp.route("/bases/<slug>/recreate", methods=["POST"])
 @auth.operator_required
 def recreate(slug):

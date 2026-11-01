@@ -3,7 +3,8 @@ at startup) IMAGE is pulled, and a base whose container runs an older
 image than the one the tag now points at is recreated on it, keeping its
 data - the control panel's Recreate, done by itself. With the default
 IMAGE, :latest, that's every GTNH Craft Monitor release. The control
-panel's Check now runs the same check on request.
+panel's Check now runs the same check on request, and its Recreate all
+recreates every base whatever its image (to pick up new labels, say).
 
 Compared by image ID, not name: a moved tag (latest, 6.1) keeps its name.
 The shared game data is indexed with the new image first, so the bases
@@ -48,16 +49,30 @@ def _check(provisioner):
     ]
     if not outdated:
         return []
+    return _recreate_each(provisioner, outdated)
+
+
+def recreate_all(provisioner):
+    """Recreates every base on the current IMAGE, as it was pulled last,
+    whether or not it's already on it: how a change to the containers
+    themselves (their labels, limits) reaches the bases already made.
+    Returns the slugs recreated."""
+    with _lock:
+        bases = db.all_bases()
+        return _recreate_each(provisioner, bases) if bases else []
+
+
+def _recreate_each(provisioner, bases):
     indexer.run(provisioner)
-    upgraded = []
-    for base in outdated:
+    recreated = []
+    for base in bases:
         try:
-            log.info("Recreating %s on the new %s", base["slug"], config.IMAGE)
+            log.info("Recreating %s on %s", base["slug"], config.IMAGE)
             recreate(provisioner, base)
-            upgraded.append(base["slug"])
+            recreated.append(base["slug"])
         except Exception:
-            log.exception("Upgrading %s failed", base["slug"])
-    return upgraded
+            log.exception("Recreating %s failed", base["slug"])
+    return recreated
 
 
 def start(provisioner):

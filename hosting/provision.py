@@ -342,33 +342,46 @@ def gamedata_volume_name(slug):
 def container_spec(slug, api_key):
     """docker-py's containers.run() arguments for slug's base."""
     router = f"{config.INSTANCE}-{slug}"
+    icons = f"{router}-icons"
+    host = f"Host(`{slug}.{config.DOMAIN}`)"
     labels = {
         LABEL: slug,
         INSTANCE_LABEL: config.INSTANCE,
         "traefik.enable": "true",
         "traefik.docker.network": config.NETWORK,
-        f"traefik.http.routers.{router}.rule": f"Host(`{slug}.{config.DOMAIN}`)",
+        f"traefik.http.routers.{router}.rule": host,
+        # Icons on a router of their own (the longer rule wins) with a
+        # looser limit: scrolling the Network tab asks for a new one per
+        # cell, hundreds a second, and they're cheap and cached.
+        f"traefik.http.routers.{icons}.rule": f"{host} && PathPrefix(`/icons`)",
+        f"traefik.http.routers.{router}.service": router,
+        f"traefik.http.routers.{icons}.service": router,
         f"traefik.http.services.{router}.loadbalancer.server.port": str(PORT),
     }
-    if config.DOMAIN != "localhost":
-        labels[f"traefik.http.routers.{router}.entrypoints"] = "websecure"
-        labels[f"traefik.http.routers.{router}.tls.certresolver"] = config.CERT_RESOLVER
-        # The one wildcard certificate this app's own router asks for
-        # (docker-compose.yml), not one per base: Traefik sees it already
-        # has it. So there's nothing new to issue when a base is made, and
-        # base names stay out of the public certificate logs.
-        labels[f"traefik.http.routers.{router}.tls.domains[0].main"] = config.DOMAIN
-        labels[f"traefik.http.routers.{router}.tls.domains[0].sans"] = f"*.{config.DOMAIN}"
-    if config.RATE_LIMIT_AVERAGE:
-        # Its own, not one shared through another container's labels: that
-        # one going away would take every base's router with it.
-        middleware = f"{router}-ratelimit"
-        labels[f"traefik.http.middlewares.{middleware}.ratelimit.average"] = str(config.RATE_LIMIT_AVERAGE)
-        labels[f"traefik.http.middlewares.{middleware}.ratelimit.burst"] = str(config.RATE_LIMIT_BURST)
-        # Traefik sets it to whoever connected, or keeps a trusted front
-        # proxy's (deploy/compose.edge.yml): the client either way.
-        labels[f"traefik.http.middlewares.{middleware}.ratelimit.sourcecriterion.requestheadername"] = "X-Real-Ip"
-        labels[f"traefik.http.routers.{router}.middlewares"] = middleware
+    limits = {
+        router: (config.RATE_LIMIT_AVERAGE, config.RATE_LIMIT_BURST),
+        icons: (config.ICON_RATE_LIMIT_AVERAGE, config.ICON_RATE_LIMIT_BURST),
+    }
+    for name, (average, burst) in limits.items():
+        if config.DOMAIN != "localhost":
+            labels[f"traefik.http.routers.{name}.entrypoints"] = "websecure"
+            labels[f"traefik.http.routers.{name}.tls.certresolver"] = config.CERT_RESOLVER
+            # The one wildcard certificate this app's own router asks for
+            # (docker-compose.yml), not one per base: Traefik sees it already
+            # has it. So there's nothing new to issue when a base is made, and
+            # base names stay out of the public certificate logs.
+            labels[f"traefik.http.routers.{name}.tls.domains[0].main"] = config.DOMAIN
+            labels[f"traefik.http.routers.{name}.tls.domains[0].sans"] = f"*.{config.DOMAIN}"
+        if average:
+            # Its own, not one shared through another container's labels: that
+            # one going away would take every base's router with it.
+            middleware = f"{name}-ratelimit"
+            labels[f"traefik.http.middlewares.{middleware}.ratelimit.average"] = str(average)
+            labels[f"traefik.http.middlewares.{middleware}.ratelimit.burst"] = str(burst)
+            # Traefik sets it to whoever connected, or keeps a trusted front
+            # proxy's (deploy/compose.edge.yml): the client either way.
+            labels[f"traefik.http.middlewares.{middleware}.ratelimit.sourcecriterion.requestheadername"] = "X-Real-Ip"
+            labels[f"traefik.http.routers.{name}.middlewares"] = middleware
     environment = {
         "API_KEY": api_key,
         "PUBLIC_URL": config.base_url(slug),

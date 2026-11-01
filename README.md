@@ -229,8 +229,10 @@ Every action is logged with who did it.
   the base's databases, checked hourly.
 - **Rate limits.** Traefik answers 429 to one IP past
   `RATE_LIMIT_AVERAGE` (50) requests a second to a base, with bursts up
-  to `RATE_LIMIT_BURST` (500): enough for the page's polling and a
-  Network tab's worth of icons at once. This app's own pages allow 10 a
+  to `RATE_LIMIT_BURST` (500): enough for the page's polling. Its
+  `/icons` have their own, looser limit (`ICON_RATE_LIMIT_AVERAGE` 500,
+  `ICON_RATE_LIMIT_BURST` 5000), since scrolling the Network tab asks
+  for one per cell. This app's own pages allow 10 a
   second, bursts of 50 (`docker-compose.yml`).
 - **Networks.** Bases share the `gcm-bases` network and trust its
   subnet's `X-Forwarded-*` headers. That's safe because bases never run
