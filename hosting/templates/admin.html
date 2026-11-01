@@ -48,7 +48,7 @@
 {% if gamedata is not none %}
 <section class="gamedata">
   <h2>Shared game data</h2>
-  <p class="hint">Indexed in the shared folder with {{ image }}, so bases don't each build their own copy: at startup, every {{ "%d min" % (gamedata_index_seconds // 60) if gamedata_index_seconds >= 60 else "%ds" % gamedata_index_seconds }}, and before a base is made or recreated.
+  <p class="hint">Indexed in the shared folder with {{ image }} (icons and lookups, and recipes for the pattern check), so bases don't each build their own copy: at startup, every {{ "%d min" % (gamedata_index_seconds // 60) if gamedata_index_seconds >= 60 else "%ds" % gamedata_index_seconds }}, and before a base is made or recreated.
     {% if gamedata.at %}Last checked {{ gamedata.at|when }}.{% else %}Not checked yet.{% endif %}</p>
   {% if gamedata.result and gamedata.result.error %}<p class="error">{{ gamedata.result.error }}</p>{% endif %}
   {% if gamedata.result and gamedata.result.versions %}
