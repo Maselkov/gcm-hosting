@@ -4,7 +4,9 @@ indexed.
 With GAMEDATA_DOWNLOAD, every version GAMEDATA_REPO publishes is fetched
 into the shared folder, every texture set, and fetched again when its
 release is rebuilt: at startup and every GAMEDATA_INDEX_SECONDS. So a base
-never downloads its own, whatever version its admin picks.
+never downloads its own, whatever version its admin picks. A running base
+reads its version's files only when it starts, so the running bases on a
+version that was downloaded again are restarted once it's indexed.
 
 A base reads a version's indexes (gcm/gamedata_index.py and, for the
 pattern check, gcm/recipe_index.py in GTNH Craft Monitor) from the shared
@@ -21,7 +23,7 @@ import logging
 import threading
 import time
 
-from hosting import config
+from hosting import config, db
 
 log = logging.getLogger("hosting.indexer")
 
@@ -99,6 +101,46 @@ def downloaded_any(result):
     return any(v["state"] == "downloaded" for v in (result or {}).get("versions", []))
 
 
+def restart_bases(provisioner, downloaded, indexed):
+    """Restarts the running bases whose picked version was downloaded and
+    is now indexed, so they load it: until then a base keeps the files it
+    started with (or, if it hadn't opened its icons yet, reads the new
+    zip with the old lookups). One whose index failed is left alone: it
+    would build its own, more than a base's MEMORY_LIMIT. Returns the
+    slugs restarted."""
+    fetched = {v["version"] for v in (downloaded or {}).get("versions", []) if v["state"] == "downloaded"}
+    ready = {v["version"] for v in (indexed or {}).get("versions", []) if v["state"] in ("current", "built")}
+    if fetched - ready:
+        log.warning("Not restarting the bases on %s: not indexed", sorted(fetched - ready))
+    versions = fetched & ready
+    if not versions:
+        return []
+    details = provisioner.details()
+    restarted = []
+    for base in db.all_bases():
+        slug = base["slug"]
+        if (details.get(slug) or {}).get("status") != "running":
+            continue
+        try:
+            if (provisioner.gamedata(slug) or {}).get("version") not in versions:
+                continue
+            log.info("Restarting %s on its re-downloaded game data", slug)
+            provisioner.restart(slug)
+            restarted.append(slug)
+        except Exception:
+            log.exception("Restarting %s failed", slug)
+    return restarted
+
+
+def refresh(provisioner):
+    """One round of start()'s loop."""
+    # What's there is indexed first: downloading can take minutes.
+    run(provisioner)
+    downloaded = download(provisioner)
+    if downloaded_any(downloaded):
+        restart_bases(provisioner, downloaded, run(provisioner))
+
+
 def last():
     """{at, result} of the last run."""
     with _lock:
@@ -123,10 +165,10 @@ def start(provisioner):
 
     def loop():
         while True:
-            # What's there is indexed first: downloading can take minutes.
-            run(provisioner)
-            if downloaded_any(download(provisioner)):
-                run(provisioner)
+            try:
+                refresh(provisioner)
+            except Exception:
+                log.exception("Refreshing the shared game data failed")
             time.sleep(config.GAMEDATA_INDEX_SECONDS)
 
     threading.Thread(target=loop, name="indexer", daemon=True).start()

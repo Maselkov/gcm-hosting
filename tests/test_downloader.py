@@ -7,6 +7,7 @@ import sys
 import threading
 
 import pytest
+from conftest import make_base, sign_in
 
 from hosting import config, indexer, provision
 
@@ -225,3 +226,48 @@ def test_the_panel_shows_what_was_downloaded(operator, provisioner, monkeypatch)
     assert "Just downloaded 2.9.0." in page
     assert "left alone: 2.8.4" in page
     assert "Downloading 2.8.3 failed: timed out" in page
+
+
+@pytest.fixture()
+def bases(app, provisioner, monkeypatch):
+    """alice's, bob's and carol's bases on 2.9.0, 2.8.4 and 2.9.0, with the
+    shared game data downloaded."""
+    monkeypatch.setattr(config, "GAMEDATA_SHARED_DIR", "/srv/gamedata")
+    for name, version in (("Alice", "2.9.0"), ("Bob", "2.8.4"), ("Carol", "2.9.0")):
+        player = app.test_client()
+        sign_in(player, name)
+        assert make_base(player, name.lower()).status_code == 201
+        provisioner.picked[name.lower()] = {"version": version, "textures": "default"}
+    provisioner.calls.clear()
+    return provisioner
+
+
+def restarted(provisioner):
+    return [call[1] for call in provisioner.calls if call[0] == "restart"]
+
+
+def test_running_bases_on_a_re_downloaded_version_restart_once_its_indexed(bases):
+    bases.download_result = {"versions": [{"version": "2.9.0", "state": "downloaded"}]}
+    bases.index_result = {
+        "versions": [{"version": "2.9.0", "state": "built"}, {"version": "2.8.4", "state": "current"}]
+    }
+    bases.stopped.add("carol")
+    indexer.refresh(bases)
+    assert restarted(bases) == ["alice"]
+    assert bases.calls.index(("download",)) < bases.calls.index(("index",), 1) < bases.calls.index(("restart", "alice"))
+
+
+def test_nothing_restarts_when_nothing_was_downloaded(bases):
+    indexer.refresh(bases)
+    assert restarted(bases) == []
+    assert bases.calls == [("index",), ("download",)]
+
+
+def test_a_version_whose_index_failed_doesnt_restart_its_bases(bases):
+    bases.download_result = {"versions": [{"version": "2.9.0", "state": "downloaded"}]}
+    bases.index_result = {"versions": [{"version": "2.9.0", "state": "failed", "error": "bad"}]}
+    indexer.refresh(bases)
+    assert restarted(bases) == []
+    bases.index_result = RuntimeError("docker down")
+    indexer.refresh(bases)
+    assert restarted(bases) == []

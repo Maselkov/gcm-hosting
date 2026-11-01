@@ -71,8 +71,10 @@ by about 1.2 GB per release. It runs in a short-lived container of the
 bases' `IMAGE` with network access, as the folder's owner, downloads
 into `.incoming/` and swaps each version in whole. The first run takes
 a while; until a version is there, a base that picks it downloads its
-own. A `<version>/` folder you put there yourself (one without a
-`release.json`) is left alone. `GAMEDATA_DOWNLOAD=0` turns this off:
+own. A running base reads its version's files only when it starts,
+so once a rebuilt version is downloaded and indexed, the running bases
+that picked it are restarted (a few seconds). A `<version>/` folder you
+put there yourself (one without a `release.json`) is left alone. `GAMEDATA_DOWNLOAD=0` turns this off:
 then copy `<version>/` folders in from any server that downloaded them,
 laid out like its `data/gamedata/`, and replace one when its version is
 rebuilt.
