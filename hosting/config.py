@@ -55,10 +55,13 @@ GAMEDATA_API_URL = os.environ.get("GAMEDATA_API_URL", "https://api.github.com").
 CERT_RESOLVER = os.environ.get("CERT_RESOLVER", "le")
 # Requests per second from one IP to one base (Traefik's ratelimit), on
 # average and in a burst; past them it answers 429. Generous: the page
-# polls every second or so, and opening the Network tab on a big screen
-# loads a few hundred icons at once. 0: no limit.
+# polls every second or so. 0: no limit.
 RATE_LIMIT_AVERAGE = int(os.environ.get("RATE_LIMIT_AVERAGE", "50"))
 RATE_LIMIT_BURST = int(os.environ.get("RATE_LIMIT_BURST", "500"))
+# The same for a base's /icons alone: scrolling the Network tab quickly
+# asks for a new icon per cell, far more than the rest of the page.
+ICON_RATE_LIMIT_AVERAGE = int(os.environ.get("ICON_RATE_LIMIT_AVERAGE", "500"))
+ICON_RATE_LIMIT_BURST = int(os.environ.get("ICON_RATE_LIMIT_BURST", "5000"))
 # A base with a GTNH 2.9 bundle live, a full scan and icons served holds
 # ~54 MB and peaks ~80 MB on 6.0 with its game data index pre-built
 # (GAMEDATA_SHARED_DIR), plus ~70 MB once it draws a chart. Images before
