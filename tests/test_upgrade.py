@@ -94,3 +94,41 @@ def test_players_cant_check(app, bases):
     sign_in(player, "Alice")
     assert player.post("/admin/upgrade", data={"csrf": csrf(player)}).status_code == 404
     assert recreated(bases) == []
+
+
+def test_recreate_all_recreates_every_base_on_any_image(bases, monkeypatch):
+    monkeypatch.setattr(config, "GAMEDATA_SHARED_DIR", "/srv/gamedata")
+    bases.stop("bob")
+    db.set_held("bob", 1.0)
+    assert upgrade.recreate_all(bases) == ["alice", "bob"]
+    assert ("pull",) not in bases.calls
+    assert bases.calls.index(("index",)) < bases.calls.index(("recreate", "alice", db.base("alice")["api_key"]))
+    assert "bob" in bases.stopped
+
+
+def test_the_control_panel_recreates_all_on_request(operator, bases, monkeypatch):
+    page = operator.post("/admin/recreate-all", data={"csrf": csrf(operator)}, follow_redirects=True).get_data(
+        as_text=True
+    )
+    assert "Recreated 2 bases from" in page
+    assert sorted(recreated(bases)) == ["alice", "bob"]
+    real = bases.recreate
+
+    def recreate(slug, api_key):
+        if slug == "alice":
+            raise RuntimeError("docker said no")
+        real(slug, api_key)
+
+    monkeypatch.setattr(bases, "recreate", recreate)
+    page = operator.post("/admin/recreate-all", data={"csrf": csrf(operator)}, follow_redirects=True).get_data(
+        as_text=True
+    )
+    assert "Recreated 1 base from" in page and "1 failed" in page
+    assert operator.post("/admin/recreate-all").status_code == 400  # no CSRF token
+
+
+def test_players_cant_recreate_all(app, bases):
+    player = app.test_client()
+    sign_in(player, "Alice")
+    assert player.post("/admin/recreate-all", data={"csrf": csrf(player)}).status_code == 404
+    assert recreated(bases) == []
