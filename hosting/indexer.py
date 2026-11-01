@@ -6,11 +6,12 @@ into the shared folder, every texture set, and fetched again when its
 release is rebuilt: at startup and every GAMEDATA_INDEX_SECONDS. So a base
 never downloads its own, whatever version its admin picks.
 
-A base reads a version's index (gcm/gamedata_index.py in GTNH Craft
-Monitor) from the shared folder when one is there and current; otherwise
-it builds its own copy in its own volume - disk, a few seconds of startup
-and ~200 MB of memory while building, for every base. So this builds them
-in the shared folder instead, with the bases' own image (an index's format
+A base reads a version's indexes (gcm/gamedata_index.py and, for the
+pattern check, gcm/recipe_index.py in GTNH Craft Monitor) from the shared
+folder when they're there and current; otherwise it builds its own copies
+in its own volume - disk, a few seconds and ~200 MB of memory while
+building each, for every base, which for the recipe index is more than a
+base's MEMORY_LIMIT. So this builds them in the shared folder instead, with the bases' own image (an index's format
 belongs to the server version that reads it): at startup, every
 GAMEDATA_INDEX_SECONDS, after a download, before a base is made or
 recreated, and from the control panel. Versions already indexed are only

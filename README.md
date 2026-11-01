@@ -76,9 +76,12 @@ own. A `<version>/` folder you put there yourself (one without a
 then copy `<version>/` folders in from any server that downloaded them,
 laid out like its `data/gamedata/`, and replace one when its version is
 rebuilt.
-Each version also needs an index there (its icon and item lookups as one
-file, read in place), or every base builds its own copy of it. This app
-builds them for you: with the bases' `IMAGE`, since an index's format
+Each version also needs its indexes there, or every base builds its own
+copy of them: its icon and item lookups as one file, read in place, and
+its GregTech recipes for the pattern check (`recipes.sqlite`, about 60
+MB). Building the recipe index takes about 200 MB, more than a base's
+`MEMORY_LIMIT`, so without a shared one a base's pattern check fails.
+This app builds them for you: with the bases' `IMAGE`, since an index's format
 belongs to the server version, in a short-lived container that's the
 only thing mounting the folder writable, as the folder's owner. It runs
 at startup, every `GAMEDATA_INDEX_SECONDS` (900), before a base is made
@@ -87,7 +90,9 @@ already indexed is only checked, which takes well under a second, and a
 new one takes a couple of seconds. The control panel shows each version's
 state.
 This needs GTNH Craft Monitor 6.0 or later; older images ignore
-`GAMEDATA_SHARED_DIR` and download their own. The app pulls `IMAGE` at
+`GAMEDATA_SHARED_DIR` and download their own. The shared recipe index
+needs a release after 8.1: the indexer only builds it with an image
+that reads it. The app pulls `IMAGE` at
 startup, before the first index, so a tag that's moved (`latest`, `6.1`)
 isn't left at an older copy Docker had cached; if the pull fails, it uses
 the local copy.

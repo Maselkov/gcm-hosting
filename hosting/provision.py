@@ -81,11 +81,14 @@ print(json.dumps(max(times) if times else None))
 
 
 # Run in a one-off container of IMAGE over the shared game data
-# (hosting/indexer.py): builds each version's index (gcm/gamedata_index.py)
-# that's missing or out of date, so bases read the shared one instead of
-# each building its own. With the bases' image, so the index is the format
-# their server reads. Prints {versions: [{version, state[, error]}]} or
-# {error}.
+# (hosting/indexer.py): builds each version's indexes that are missing or
+# out of date - the game data's (gcm/gamedata_index.py) and, where the
+# bundle has recipes, the pattern check's (gcm/recipe_index.py) - so
+# bases read the shared ones instead of each building their own. With the
+# bases' image, so an index is the format their server reads; a recipe
+# index only with an image that reads one beside the bundle (its
+# recipe_index has FILE). Prints {versions: [{version, state[, error]}]}
+# or {error}.
 INDEX_SCRIPT = """
 import json, os, sys
 root = sys.argv[1]
@@ -99,20 +102,33 @@ try:
 except ImportError as e:
     print(json.dumps({"error": f"this image has no game data index ({e})"}))
     sys.exit(0)
+try:
+    from gcm import recipe_index as r
+except ImportError:
+    r = None
+RECIPES = "recipes.json.gz"
 out = []
 for name in sorted(os.listdir(root)):
     bundle = os.path.join(root, name)
     if not os.path.isfile(os.path.join(bundle, "data.json")):
         continue
-    path = os.path.join(bundle, g.FILE)
-    try:
-        if g.is_current(path, bundle):
-            out.append({"version": name, "state": "current"})
-        else:
-            g.build(bundle, path)
-            out.append({"version": name, "state": "built"})
-    except Exception as e:
-        out.append({"version": name, "state": "failed", "error": str(e)})
+    # (what a failure is called, index, what it's built from, its module)
+    indexes = [("", os.path.join(bundle, g.FILE), bundle, g)]
+    recipes = os.path.join(bundle, RECIPES)
+    if getattr(r, "FILE", None) and os.path.isfile(recipes):
+        indexes.append(("recipes: ", os.path.join(bundle, r.FILE), recipes, r))
+    state, errors = "current", []
+    for label, path, source, module in indexes:
+        try:
+            if not module.is_current(path, source):
+                module.build(source, path)
+                state = "built"
+        except Exception as e:
+            errors.append(f"{label}{e}")
+    if errors:
+        out.append({"version": name, "state": "failed", "error": "; ".join(errors)})
+    else:
+        out.append({"version": name, "state": state})
 print(json.dumps({"versions": out}))
 """
 INDEXER_MOUNT = "/gamedata"
@@ -126,7 +142,8 @@ def indexer_spec():
         "volumes": {config.GAMEDATA_SHARED_DIR: {"bind": INDEXER_MOUNT, "mode": "rw"}},
         "labels": {"gcm-hosting.indexer": "1", INSTANCE_LABEL: config.INSTANCE},
         "network_disabled": True,
-        # Building holds a version's whole lookup and zip directory at once.
+        # Building holds a version's whole lookup and zip directory, or its
+        # recipes, at once: ~200 MB each.
         "mem_limit": "1g",
         "remove": True,
     }
@@ -138,7 +155,9 @@ def indexer_spec():
 # (the base's gcm/gamedata.py does the same for its own folder). A
 # version folder without release.json was put there by hand and is left
 # alone. Each goes into .incoming/ first and is swapped in whole, so
-# neither the indexer nor a base sees half of one. Prints
+# neither the indexer nor a base sees half of one; a version that's
+# current but lacks a file (deleted, or one this didn't fetch before)
+# gets just that file, the same way. Prints
 # {versions: [{version, state[, error]}]} or {error}.
 DOWNLOAD_SCRIPT = """
 import hashlib, json, os, re, shutil, sys, urllib.request
@@ -149,7 +168,7 @@ if os.getuid() == 0:
     os.setuid(owner.st_uid)
 PREFIX = "gtnh-data-"
 BASE = ("data.json", "icons_lookup.json", "item_catalog.txt")
-OPTIONAL = ("ore_dict.json", "item_info.json")
+OPTIONAL = ("ore_dict.json", "item_info.json", "recipes.json.gz")
 TEXTURES = ("images.zip", "images-faithful32.zip")
 VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 RECORD = "release.json"
@@ -192,10 +211,26 @@ for release in releases:
     if installed is None and os.path.exists(target):
         out.append({"version": version, "state": "manual"})
         continue
-    if installed == assets["data.json"]["id"] and all(
-        os.path.isfile(os.path.join(target, n)) for n in names
-    ):
-        out.append({"version": version, "state": "current"})
+    if installed == assets["data.json"]["id"]:
+        missing = [n for n in names if not os.path.isfile(os.path.join(target, n))]
+        part = None
+        try:
+            if missing:
+                with open(os.path.join(target, "data.json"), encoding="utf-8") as f:
+                    expected = json.load(f)["files"]
+                missing = [n for n in missing if n in expected]
+                os.makedirs(incoming, exist_ok=True)
+            for name in missing:
+                part = os.path.join(incoming, f"{instance}-{version}-{name}")
+                if download(assets[name]["browser_download_url"], part) != expected[name]["sha256"]:
+                    raise ValueError(f"{name} doesn't match its checksum in data.json")
+                os.replace(part, os.path.join(target, name))
+            out.append({"version": version, "state": "downloaded" if missing else "current"})
+        except Exception as e:
+            out.append({"version": version, "state": "failed", "error": str(e)})
+        finally:
+            if part and os.path.exists(part):
+                os.remove(part)
         continue
     part = os.path.join(incoming, f"{instance}-{version}")
     old = part + ".old"

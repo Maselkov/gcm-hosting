@@ -121,12 +121,41 @@ def test_a_rebuilt_release_replaces_the_version(tmp_path, github):
     assert (tmp_path / "2.9.0" / "images.zip").read_bytes() == b"new icons"
 
 
-def test_a_missing_texture_set_is_fetched(tmp_path, github):
+def test_a_missing_texture_set_is_fetched_alone(tmp_path, github):
     github.publish("2.9.0", 1, BUNDLE)
     download(tmp_path, github)
     (tmp_path / "2.9.0" / "images-faithful32.zip").unlink()
+    github.requests.clear()
     assert states(download(tmp_path, github)) == {"2.9.0": "downloaded"}
     assert (tmp_path / "2.9.0" / "images-faithful32.zip").exists()
+    assert github.requests[1:] == ["/dl/2.9.0/1/images-faithful32.zip"]
+    assert os.listdir(tmp_path / ".incoming") == []
+
+
+def test_recipes_are_fetched_for_a_version_downloaded_before_they_were(tmp_path, github):
+    github.publish("2.9.0", 1, {**BUNDLE, "recipes.json.gz": b"recipes"})
+    download(tmp_path, github)
+    assert (tmp_path / "2.9.0" / "recipes.json.gz").read_bytes() == b"recipes"
+    # As a version downloaded when this didn't fetch recipes has it.
+    (tmp_path / "2.9.0" / "recipes.json.gz").unlink()
+    (tmp_path / "2.9.0" / "index.sqlite").write_bytes(b"index")
+    github.requests.clear()
+    assert states(download(tmp_path, github)) == {"2.9.0": "downloaded"}
+    assert (tmp_path / "2.9.0" / "recipes.json.gz").read_bytes() == b"recipes"
+    # Not the whole version again, and its index is kept.
+    assert github.requests[1:] == ["/dl/2.9.0/1/recipes.json.gz"]
+    assert (tmp_path / "2.9.0" / "index.sqlite").exists()
+
+
+def test_a_missing_file_with_a_bad_checksum_isnt_put_in_place(tmp_path, github):
+    github.publish("2.9.0", 1, {**BUNDLE, "recipes.json.gz": b"recipes"})
+    download(tmp_path, github)
+    (tmp_path / "2.9.0" / "recipes.json.gz").unlink()
+    github.files["/dl/2.9.0/1/recipes.json.gz"] = b"something else"
+    result = download(tmp_path, github)
+    assert result["versions"][0]["state"] == "failed" and "checksum" in result["versions"][0]["error"]
+    assert not (tmp_path / "2.9.0" / "recipes.json.gz").exists()
+    assert os.listdir(tmp_path / ".incoming") == []
 
 
 def test_a_version_put_there_by_hand_is_left_alone(tmp_path, github):
