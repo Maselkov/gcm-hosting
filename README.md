@@ -108,7 +108,9 @@ The shared game data is indexed with the new image first, and a base you
 stopped stays stopped. Players see their base restart, a few seconds.
 Images are compared by ID, so this works for any tag that moves: pin
 `IMAGE` to `6.1` to get only 6.1.x, or set `UPGRADE_CHECK_SECONDS=0` to
-upgrade only with **Recreate**.
+upgrade only by hand. The control panel's **Check for upgrades now** runs
+the same check right away, say just after a release. **Recreate** alone
+doesn't pull: it uses the image Docker already has.
 
 ### Limits
 

@@ -2,7 +2,8 @@
 at startup) IMAGE is pulled, and a base whose container runs an older
 image than the one the tag now points at is recreated on it, keeping its
 data - the control panel's Recreate, done by itself. With the default
-IMAGE, :latest, that's every GTNH Craft Monitor release.
+IMAGE, :latest, that's every GTNH Craft Monitor release. The control
+panel's Check now runs the same check on request.
 
 Compared by image ID, not name: a moved tag (latest, 6.1) keeps its name.
 The shared game data is indexed with the new image first, so the bases
@@ -17,6 +18,8 @@ from hosting import config, db, indexer
 
 log = logging.getLogger("hosting.upgrade")
 
+_lock = threading.Lock()  # one check at a time: the loop's or the panel's
+
 
 def recreate(provisioner, base):
     """A new container for base on the current IMAGE, on the same data;
@@ -28,12 +31,17 @@ def recreate(provisioner, base):
 
 def check(provisioner):
     """Pulls IMAGE and recreates the bases on an older one. Returns the
-    slugs recreated."""
+    slugs recreated, or None if IMAGE couldn't be pulled."""
+    with _lock:
+        return _check(provisioner)
+
+
+def _check(provisioner):
     if not provisioner.pull_image():
-        return []
+        return None
     current = provisioner.image_id()
     if not current:
-        return []
+        return None
     details = provisioner.details()
     outdated = [
         base for base in db.all_bases() if (details.get(base["slug"]) or {}).get("image_id") not in (None, current)
