@@ -63,7 +63,7 @@ import json, sqlite3
 times = []
 for name, sql in (
     ("power.db", "SELECT MAX(ts) FROM power_readings"),
-    ("app.db", "SELECT MAX(updated_at) FROM network_snapshot"),
+    ("item_history.db", "SELECT MAX(updated_at) FROM network_snapshot"),
     ("app.db", "SELECT MAX(occurred_at) FROM craft_events"),
 ):
     try:
