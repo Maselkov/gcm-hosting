@@ -148,6 +148,19 @@ def test_recipes_are_fetched_for_a_version_downloaded_before_they_were(tmp_path,
     assert (tmp_path / "2.9.0" / "index.sqlite").exists()
 
 
+def test_multiblock_kit_files_are_fetched_for_a_version_downloaded_before_they_were(tmp_path, github):
+    kits = {"structures.json.gz": b"structures", "layouts.json.gz": b"layouts", "layouts.png": b"atlas"}
+    github.publish("2.9.0", 1, {**BUNDLE, **kits})
+    download(tmp_path, github)
+    for name in kits:
+        (tmp_path / "2.9.0" / name).unlink()
+    github.requests.clear()
+    assert states(download(tmp_path, github)) == {"2.9.0": "downloaded"}
+    for name, data in kits.items():
+        assert (tmp_path / "2.9.0" / name).read_bytes() == data
+    assert sorted(github.requests[1:]) == sorted(f"/dl/2.9.0/1/{name}" for name in kits)
+
+
 def test_a_missing_file_with_a_bad_checksum_isnt_put_in_place(tmp_path, github):
     github.publish("2.9.0", 1, {**BUNDLE, "recipes.json.gz": b"recipes"})
     download(tmp_path, github)

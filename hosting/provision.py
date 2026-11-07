@@ -168,7 +168,10 @@ if os.getuid() == 0:
     os.setuid(owner.st_uid)
 PREFIX = "gtnh-data-"
 BASE = ("data.json", "icons_lookup.json", "item_catalog.txt")
-OPTIONAL = ("ore_dict.json", "item_info.json", "recipes.json.gz")
+# The monitor's gamedata.OPTIONAL_FILES: multiblock kits (structures,
+# layouts) need the last three.
+OPTIONAL = ("ore_dict.json", "item_info.json", "recipes.json.gz", "structures.json.gz",
+            "layouts.json.gz", "layouts.png")
 TEXTURES = ("images.zip", "images-faithful32.zip")
 VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 RECORD = "release.json"
