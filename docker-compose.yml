@@ -7,7 +7,7 @@
 services:
   traefik:
     # v3.6+: older ones speak a Docker API version Docker 29 refuses.
-    image: traefik:v3.6
+    image: traefik:v3.7
     restart: unless-stopped
     command:
       - --providers.docker=true
